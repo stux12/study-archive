@@ -1,0 +1,64 @@
+name: Notion 검수본 배포
+
+on:
+  workflow_dispatch:
+    inputs:
+      sync_notion:
+        description: 'Notion의 Published 글을 먼저 동기화합니다.'
+        required: true
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - id: pages
+        uses: actions/configure-pages@v5
+      - name: Notion Published 글 동기화
+        if: inputs.sync_notion
+        run: npm run sync:notion
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          NOTION_DATA_SOURCE_ID: ${{ secrets.NOTION_DATA_SOURCE_ID }}
+          NOTION_TITLE_PROPERTY: ${{ vars.NOTION_TITLE_PROPERTY || '제목' }}
+          NOTION_STATUS_PROPERTY: ${{ vars.NOTION_STATUS_PROPERTY || '상태' }}
+          NOTION_TAGS_PROPERTY: ${{ vars.NOTION_TAGS_PROPERTY || '태그' }}
+          NOTION_CATEGORY_PROPERTY: ${{ vars.NOTION_CATEGORY_PROPERTY || '카테고리' }}
+          NOTION_SLUG_PROPERTY: ${{ vars.NOTION_SLUG_PROPERTY || '슬러그' }}
+          NOTION_SUMMARY_PROPERTY: ${{ vars.NOTION_SUMMARY_PROPERTY || '요약' }}
+          NOTION_DATE_PROPERTY: ${{ vars.NOTION_DATE_PROPERTY || '학습일' }}
+      - name: 사이트 빌드
+        run: npm run build
+        env:
+          BASE_PATH: ${{ steps.pages.outputs.base_path }}
+          SITE_URL: https://${{ github.repository_owner }}.github.io
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./dist
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

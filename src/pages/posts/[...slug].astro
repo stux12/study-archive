@@ -1,0 +1,30 @@
+---
+import { getCollection, render } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+
+export async function getStaticPaths() {
+  const posts = await getCollection('posts', ({ data }) => !data.draft);
+  return posts.map((post) => ({ params: { slug: post.id }, props: { post } }));
+}
+const { post } = Astro.props;
+const { Content } = await render(post);
+---
+<BaseLayout title={`${post.data.title} | 공부 아카이브`} description={post.data.description}>
+  <article class="post">
+    <a href={import.meta.env.BASE_URL}>← 모든 기록</a>
+    <p class="meta">{post.data.category} · {post.data.date.toLocaleDateString('ko-KR')}</p>
+    <h1>{post.data.title}</h1>
+    <p class="description">{post.data.description}</p>
+    <div class="tags">{post.data.tags.map((tag) => <span>#{tag}</span>)}</div>
+    <hr />
+    <Content />
+  </article>
+</BaseLayout>
+<style>
+  .post { max-width: 740px; }
+  .meta { margin: 32px 0 4px; color: #2563eb; font-weight: 700; }
+  h1 { margin: 0; font-size: clamp(2rem, 5vw, 3.25rem); }
+  .description { color: #64748b; font-size: 1.12rem; }
+  .tags span { margin-right: 10px; color: #64748b; font-size: .9rem; }
+  hr { border: 0; border-top: 1px solid #e2e8f0; margin: 32px 0; }
+</style>
