@@ -2,9 +2,10 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 
 const token = process.env.NOTION_TOKEN;
-const dataSourceId = process.env.NOTION_DATA_SOURCE_ID;
-if (!token || !dataSourceId) {
-  throw new Error('NOTION_TOKEN과 NOTION_DATA_SOURCE_ID를 설정해야 합니다. .env.example을 확인하세요.');
+const configuredDataSourceId = process.env.NOTION_DATA_SOURCE_ID;
+const databaseId = process.env.NOTION_DATABASE_ID;
+if (!token || (!configuredDataSourceId && !databaseId)) {
+  throw new Error('NOTION_TOKEN과 NOTION_DATABASE_ID(또는 NOTION_DATA_SOURCE_ID)를 설정해야 합니다. .env.example을 확인하세요.');
 }
 
 const property = {
@@ -58,6 +59,12 @@ function blockToMarkdown(block) {
 }
 
 async function main() {
+  let dataSourceId = configuredDataSourceId;
+  if (!dataSourceId) {
+    const database = await api(`/databases/${databaseId}`);
+    dataSourceId = database.data_sources?.[0]?.id;
+    if (!dataSourceId) throw new Error('노션 데이터베이스에서 Data Source를 찾지 못했습니다.');
+  }
   const pages = [];
   let cursor;
   do {

@@ -35,7 +35,7 @@
 2. 저장소 **Settings → Pages → Source**에서 **GitHub Actions**를 선택합니다.
 3. 저장소 **Settings → Secrets and variables → Actions → Secrets**에 다음을 추가합니다.
    - `NOTION_TOKEN`: Notion Internal integration secret
-   - `NOTION_DATA_SOURCE_ID`: 노션 데이터베이스의 data source ID
+   - `NOTION_DATABASE_ID`: 노션 데이터베이스 URL에 있는 32자리 Database ID
 4. Notion 연결에 해당 데이터베이스 읽기 권한을 부여합니다.
 5. Actions 탭에서 `Notion 검수본 배포`를 수동 실행합니다.
 
@@ -54,7 +54,7 @@ npm run dev
 
 ```powershell
 $env:NOTION_TOKEN = 'secret_xxx'
-$env:NOTION_DATA_SOURCE_ID = '...'
+$env:NOTION_DATABASE_ID = '...'
 npm run sync:notion
 npm run build
 ```

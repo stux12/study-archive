@@ -37,6 +37,7 @@ jobs:
         run: npm run sync:notion
         env:
           NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
           NOTION_DATA_SOURCE_ID: ${{ secrets.NOTION_DATA_SOURCE_ID }}
           NOTION_TITLE_PROPERTY: ${{ vars.NOTION_TITLE_PROPERTY || '제목' }}
           NOTION_STATUS_PROPERTY: ${{ vars.NOTION_STATUS_PROPERTY || '상태' }}
