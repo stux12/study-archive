@@ -18,9 +18,11 @@
 
 - `Inbox`: 자료만 모아 둔 상태
 - `Draft`: AI 초안을 붙여넣은 상태
-- `Review`: 직접 확인·수정 중인 상태
-- `Published`: GitHub Pages 발행 후보
-- `Archived`: 사이트에서 제외하되 기록은 보존
+- `Review`: 직접 확인·수정 중인 상태 → [발행 검수 체크리스트](publish-review-checklist.md)를 통과하면 `Published`로
+- `Published`: GitHub Pages 발행 후보 (동기화 대상)
+- `Archived`: 사이트에서 제외하되 기록은 보존 (삭제 대신 이 상태로)
+
+> 발행 전 확인 절차는 [발행 검수 체크리스트](publish-review-checklist.md)를 참고하세요.
 
 ## 새 글 템플릿
 

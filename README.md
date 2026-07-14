@@ -5,9 +5,9 @@
 ## 작동 방식
 
 1. AI에게 학습 내용을 정리하게 한 뒤 노션 데이터베이스에 저장합니다.
-2. 직접 읽고 수정합니다. 공개할 글만 상태를 `Published`로 변경합니다.
-3. GitHub의 **Actions → Notion 검수본 배포 → Run workflow**를 누릅니다.
-4. 워크플로가 `Published` 글만 가져와 사이트를 빌드하고 배포합니다.
+2. 직접 읽고 수정합니다. [발행 검수 체크리스트](docs/publish-review-checklist.md)를 통과한 글만 상태를 `Published`로 변경합니다.
+3. GitHub의 **Actions → Notion 검수본 배포 → Run workflow**를 누릅니다. `dry_run`을 켜면 배포 대상 글 목록만 미리 확인할 수 있습니다.
+4. 워크플로가 `Published` 글만 가져와 사이트를 빌드하고 배포합니다. 중복 슬러그·0건 동기화는 자동으로 차단됩니다.
 
 `Draft`, `Review` 등 다른 상태의 글은 절대 동기화하지 않습니다.
 
