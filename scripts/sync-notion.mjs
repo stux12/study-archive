@@ -58,13 +58,7 @@ function blockToMarkdown(block) {
   return content ? `${content}\n` : '';
 }
 
-async function main() {
-  let dataSourceId = configuredDataSourceId;
-  if (!dataSourceId) {
-    const database = await api(`/databases/${databaseId}`);
-    dataSourceId = database.data_sources?.[0]?.id;
-    if (!dataSourceId) throw new Error('노션 데이터베이스에서 Data Source를 찾지 못했습니다.');
-  }
+async function queryPublishedPages(dataSourceId) {
   const pages = [];
   let cursor;
   do {
@@ -75,11 +69,12 @@ async function main() {
     pages.push(...result.results);
     cursor = result.has_more ? result.next_cursor : undefined;
   } while (cursor);
+  return pages;
+}
 
-  const output = path.resolve('src/content/posts');
-  await fs.mkdir(output, { recursive: true });
-  await Promise.all((await fs.readdir(output)).filter((file) => file.endsWith('.md') && file !== 'welcome.md').map((file) => fs.unlink(path.join(output, file))));
-
+// 노션 페이지를 사이트에 쓰기 좋은 형태로 정리한다(본문 blocks 포함).
+async function preparePages(pages) {
+  const entries = [];
   for (const page of pages) {
     const title = text(value(page, property.title, 'title')) || '제목 없음';
     const slug = value(page, property.slug, 'rich_text')?.length ? slugify(text(value(page, property.slug, 'rich_text'))) : slugify(title);
@@ -88,10 +83,79 @@ async function main() {
     const summary = text(value(page, property.summary, 'rich_text'));
     const date = value(page, property.date, 'date')?.start || page.last_edited_time.slice(0, 10);
     const blocks = await blocksFor(page.id);
-    const frontmatter = `---\ntitle: ${JSON.stringify(title)}\ndescription: ${JSON.stringify(summary)}\ndate: ${date}\ncategory: ${JSON.stringify(category)}\ntags: ${JSON.stringify(tags)}\ndraft: false\nnotionId: ${JSON.stringify(page.id)}\n---\n\n`;
-    await fs.writeFile(path.join(output, `${slug}.md`), frontmatter + blocks.map(blockToMarkdown).join('\n'), 'utf8');
+    const body = blocks.map(blockToMarkdown).join('\n');
+    entries.push({ id: page.id, title, slug, tags, category, summary, date, body });
   }
-  console.log(`${pages.length}개의 Published 노션 페이지를 동기화했습니다.`);
+  return entries;
 }
 
-main();
+// 발행 안전장치: 배포로 넘어가기 전에 조용한 데이터 손실을 막는다.
+function validateEntries(entries, { allowEmpty }) {
+  const problems = [];
+  const warnings = [];
+
+  // (1) 0건 가드: 상태값 오타/필터 문제로 전체 글이 지워지는 사고 방지
+  if (entries.length === 0 && !allowEmpty) {
+    problems.push('Published 상태의 글이 0건입니다. 상태값/필터를 확인하세요. 의도한 것이라면 ALLOW_EMPTY_SYNC=1 로 실행하세요.');
+  }
+
+  // (2) 중복 슬러그: 같은 파일명으로 저장돼 한 글이 조용히 덮어써지는 것 차단
+  const bySlug = new Map();
+  for (const entry of entries) {
+    if (!bySlug.has(entry.slug)) bySlug.set(entry.slug, []);
+    bySlug.get(entry.slug).push(entry.title);
+  }
+  for (const [slug, titles] of bySlug) {
+    if (titles.length > 1) {
+      problems.push(`중복 슬러그 "${slug}" → ${titles.map((t) => JSON.stringify(t)).join(', ')} (노션 '슬러그' 속성으로 구분하세요)`);
+    }
+  }
+
+  // (3) 경고: 발행은 막지 않되 품질 문제를 드러낸다
+  for (const entry of entries) {
+    if (!entry.summary.trim()) warnings.push(`요약 없음: ${JSON.stringify(entry.title)} (${entry.slug})`);
+    if (!entry.body.trim()) warnings.push(`본문이 비어 있음: ${JSON.stringify(entry.title)} (${entry.slug})`);
+  }
+
+  return { problems, warnings };
+}
+
+async function writeEntries(entries) {
+  const output = path.resolve('src/content/posts');
+  await fs.mkdir(output, { recursive: true });
+  await Promise.all((await fs.readdir(output)).filter((file) => file.endsWith('.md') && file !== 'welcome.md').map((file) => fs.unlink(path.join(output, file))));
+
+  for (const entry of entries) {
+    const frontmatter = `---\ntitle: ${JSON.stringify(entry.title)}\ndescription: ${JSON.stringify(entry.summary)}\ndate: ${entry.date}\ncategory: ${JSON.stringify(entry.category)}\ntags: ${JSON.stringify(entry.tags)}\ndraft: false\nnotionId: ${JSON.stringify(entry.id)}\n---\n\n`;
+    await fs.writeFile(path.join(output, `${entry.slug}.md`), frontmatter + entry.body, 'utf8');
+  }
+}
+
+async function main() {
+  let dataSourceId = configuredDataSourceId;
+  if (!dataSourceId) {
+    const database = await api(`/databases/${databaseId}`);
+    dataSourceId = database.data_sources?.[0]?.id;
+    if (!dataSourceId) throw new Error('노션 데이터베이스에서 Data Source를 찾지 못했습니다.');
+  }
+
+  const pages = await queryPublishedPages(dataSourceId);
+  const entries = await preparePages(pages);
+  const { problems, warnings } = validateEntries(entries, { allowEmpty: process.env.ALLOW_EMPTY_SYNC === '1' });
+
+  for (const warning of warnings) console.warn(`⚠️  ${warning}`);
+
+  if (problems.length) {
+    console.error('\n❌ 동기화를 중단합니다. 다음 문제를 먼저 해결하세요:');
+    for (const problem of problems) console.error(`  - ${problem}`);
+    process.exit(1);
+  }
+
+  await writeEntries(entries);
+  console.log(`✅ ${entries.length}개의 Published 노션 페이지를 동기화했습니다.`);
+}
+
+main().catch((error) => {
+  console.error(error instanceof Error ? error.message : error);
+  process.exit(1);
+});
