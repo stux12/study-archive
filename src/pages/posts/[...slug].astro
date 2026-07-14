@@ -8,23 +8,54 @@ export async function getStaticPaths() {
 }
 const { post } = Astro.props;
 const { Content } = await render(post);
+const base = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : `${import.meta.env.BASE_URL}/`;
+const fmt = (date: Date) => date.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' });
 ---
 <BaseLayout title={`${post.data.title} | 공부 아카이브`} description={post.data.description} type="article">
   <article class="post">
-    <a href={import.meta.env.BASE_URL}>← 모든 기록</a>
-    <p class="meta">{post.data.category} · {post.data.date.toLocaleDateString('ko-KR')}</p>
-    <h1>{post.data.title}</h1>
-    <p class="description">{post.data.description}</p>
-    <div class="tags">{post.data.tags.map((tag) => <span>#{tag}</span>)}</div>
-    <hr />
-    <Content />
+    <a class="back" href={base}>
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+      모든 기록
+    </a>
+
+    <header class="post-head">
+      <p class="meta"><span class="cat">{post.data.category}</span><span class="sep">/</span><time>{fmt(post.data.date)}</time></p>
+      <h1>{post.data.title}</h1>
+      {post.data.description && <p class="lead">{post.data.description}</p>}
+    </header>
+
+    <div class="prose">
+      <Content />
+    </div>
+
+    <footer class="post-foot">
+      {post.data.tags.length > 0 && (
+        <div class="tags">{post.data.tags.map((tag) => <span class="tag">#{tag}</span>)}</div>
+      )}
+      <a class="back" href={base}>
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+        목록으로 돌아가기
+      </a>
+    </footer>
   </article>
 </BaseLayout>
 <style>
-  .post { max-width: 740px; }
-  .meta { margin: 32px 0 4px; color: #2563eb; font-weight: 700; }
-  h1 { margin: 0; font-size: clamp(2rem, 5vw, 3.25rem); }
-  .description { color: #64748b; font-size: 1.12rem; }
-  .tags span { margin-right: 10px; color: #64748b; font-size: .9rem; }
-  hr { border: 0; border-top: 1px solid #e2e8f0; margin: 32px 0; }
+  .post { max-width: var(--content); margin-inline: auto; }
+  .back { display: inline-flex; align-items: center; gap: 5px; font-family: var(--mono); color: var(--muted); font-size: .78rem; letter-spacing: .02em; text-decoration: none; transition: color .16s ease; }
+  .back:hover { color: var(--accent); }
+  .back svg { transition: transform .16s ease; }
+  .back:hover svg { transform: translateX(-2px); }
+
+  /* 상단은 최소한으로 — 제목과 도입 문단이 곧바로 본문으로 이어지게 */
+  .post-head { margin: 26px 0 30px; }
+  .meta { display: flex; align-items: center; gap: 9px; margin: 0 0 16px; font-family: var(--mono); font-size: .78rem; letter-spacing: .01em; }
+  .cat { color: var(--accent); font-weight: 600; }
+  .sep { color: var(--faint); }
+  .meta time { color: var(--muted); font-variant-numeric: tabular-nums; }
+  h1 { margin: 0; font-size: clamp(1.95rem, 1.3rem + 2.7vw, 2.8rem); font-weight: 800; letter-spacing: -.035em; line-height: 1.2; }
+  .lead { margin: 20px 0 0; color: var(--muted); font-size: 1.18rem; line-height: 1.6; text-wrap: pretty; }
+
+  .post-foot { margin-top: 56px; padding-top: 28px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 22px; }
+  .tags { display: flex; flex-wrap: wrap; gap: 8px; }
+  .tag { font-family: var(--mono); padding: 4px 10px; border-radius: 7px; background: var(--surface-2); color: var(--muted); font-size: .72rem; }
 </style>
