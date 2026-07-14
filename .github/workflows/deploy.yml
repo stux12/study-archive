@@ -3,6 +3,11 @@ name: Notion 검수본 배포
 on:
   workflow_dispatch:
     inputs:
+      dry_run:
+        description: '미리보기만: 배포 대상 글 목록을 로그에 출력하고 실제 배포는 하지 않습니다.'
+        required: true
+        type: boolean
+        default: false
       sync_notion:
         description: 'Notion의 Published 글을 먼저 동기화합니다.'
         required: true
@@ -32,9 +37,9 @@ jobs:
       - run: npm ci
       - id: pages
         uses: actions/configure-pages@v5
-      - name: Notion Published 글 동기화
-        if: inputs.sync_notion
-        run: npm run sync:notion
+      - name: Notion 동기화 / 배포 대상 미리보기
+        if: ${{ inputs.dry_run || inputs.sync_notion }}
+        run: npm run sync:notion ${{ inputs.dry_run && '-- --dry-run' || '' }}
         env:
           NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
           NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
@@ -47,15 +52,18 @@ jobs:
           NOTION_SUMMARY_PROPERTY: ${{ vars.NOTION_SUMMARY_PROPERTY || '요약' }}
           NOTION_DATE_PROPERTY: ${{ vars.NOTION_DATE_PROPERTY || '학습일' }}
       - name: 사이트 빌드
+        if: ${{ !inputs.dry_run }}
         run: npm run build
         env:
           BASE_PATH: ${{ steps.pages.outputs.base_path }}
           SITE_URL: https://${{ github.repository_owner }}.github.io
       - uses: actions/upload-pages-artifact@v3
+        if: ${{ !inputs.dry_run }}
         with:
           path: ./dist
   deploy:
     needs: build
+    if: ${{ !inputs.dry_run }}
     runs-on: ubuntu-latest
     environment:
       name: github-pages

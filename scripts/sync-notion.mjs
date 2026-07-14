@@ -120,6 +120,20 @@ function validateEntries(entries, { allowEmpty }) {
   return { problems, warnings };
 }
 
+// 배포 전에 어떤 글이 실제로 나갈지 사람이 눈으로 확인하기 위한 미리보기.
+function printPreview(entries) {
+  console.log(`\n📋 배포 대상 미리보기 — Published ${entries.length}건`);
+  entries
+    .slice()
+    .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
+    .forEach((entry, index) => {
+      const tags = entry.tags.length ? `  ${entry.tags.map((tag) => `#${tag}`).join(' ')}` : '';
+      const flags = [!entry.summary.trim() && '요약없음', !entry.body.trim() && '본문없음'].filter(Boolean);
+      const flag = flags.length ? `  ⚠️ ${flags.join(', ')}` : '';
+      console.log(`  ${String(index + 1).padStart(2)}. [${entry.category}] ${entry.title}  (${entry.slug}, ${entry.date})${tags}${flag}`);
+    });
+}
+
 async function writeEntries(entries) {
   const output = path.resolve('src/content/posts');
   await fs.mkdir(output, { recursive: true });
@@ -132,6 +146,8 @@ async function writeEntries(entries) {
 }
 
 async function main() {
+  const dryRun = process.argv.includes('--dry-run') || process.env.DRY_RUN === '1';
+
   let dataSourceId = configuredDataSourceId;
   if (!dataSourceId) {
     const database = await api(`/databases/${databaseId}`);
@@ -143,12 +159,19 @@ async function main() {
   const entries = await preparePages(pages);
   const { problems, warnings } = validateEntries(entries, { allowEmpty: process.env.ALLOW_EMPTY_SYNC === '1' });
 
+  if (dryRun) printPreview(entries);
+
   for (const warning of warnings) console.warn(`⚠️  ${warning}`);
 
   if (problems.length) {
-    console.error('\n❌ 동기화를 중단합니다. 다음 문제를 먼저 해결하세요:');
+    console.error('\n❌ 검증 실패. 다음 문제를 먼저 해결하세요:');
     for (const problem of problems) console.error(`  - ${problem}`);
     process.exit(1);
+  }
+
+  if (dryRun) {
+    console.log(`\n🔍 dry-run: 파일을 쓰지 않고 종료합니다. 위 ${entries.length}건이 배포 대상입니다.`);
+    return;
   }
 
   await writeEntries(entries);
