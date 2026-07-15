@@ -230,13 +230,13 @@ async function renderBlockMd(block, ctx) {
 }
 
 // ── 페이지 조회 / 준비 / 검증 ────────────────────────────────
-async function queryPublishedPages(dataSourceId) {
+async function queryByStatus(dataSourceId, statusValue) {
   const pages = [];
   let cursor;
   do {
     const result = await api(`/data_sources/${dataSourceId}/query`, {
       method: 'POST',
-      body: JSON.stringify({ page_size: 100, start_cursor: cursor, filter: { property: property.status, status: { equals: 'Published' } } }),
+      body: JSON.stringify({ page_size: 100, start_cursor: cursor, filter: { property: property.status, status: { equals: statusValue } } }),
     });
     pages.push(...result.results);
     cursor = result.has_more ? result.next_cursor : undefined;
@@ -244,15 +244,36 @@ async function queryPublishedPages(dataSourceId) {
   return pages;
 }
 
+function slugFor(page) {
+  const title = plain(value(page, property.title, 'title')) || '제목 없음';
+  const slugProp = value(page, property.slug, 'rich_text');
+  return slugProp?.length ? slugify(plain(slugProp)) : slugify(title);
+}
+
+// 저장소에 이미 커밋된, Notion에서 생성된 글(frontmatter에 notionId 있음)의 slug 집합
+async function readExistingNotionSlugs(outputDir) {
+  const slugs = new Set();
+  let files = [];
+  try { files = await fs.readdir(outputDir); } catch { return slugs; }
+  for (const file of files) {
+    if (!file.endsWith('.md')) continue;
+    const content = await fs.readFile(path.join(outputDir, file), 'utf8');
+    if (/^notionId:/m.test(content)) slugs.add(file.replace(/\.md$/, ''));
+  }
+  return slugs;
+}
+
 async function preparePages(pages, { dryRun }) {
   const entries = [];
   for (const page of pages) {
     const title = plain(value(page, property.title, 'title')) || '제목 없음';
-    const slug = value(page, property.slug, 'rich_text')?.length ? slugify(plain(value(page, property.slug, 'rich_text'))) : slugify(title);
+    const slug = slugFor(page);
     const tags = (value(page, property.tags, 'multi_select') || []).map((tag) => tag.name);
     const category = value(page, property.category, 'select')?.name || '미분류';
     const summary = plain(value(page, property.summary, 'rich_text'));
     const date = value(page, property.date, 'date')?.start || page.last_edited_time.slice(0, 10);
+    // 재생성 대상만 이미지 자산을 새로 내려받는다(오래된 이미지 제거). 고정된 완료 글의 자산은 건드리지 않음.
+    if (!dryRun) await fs.rm(path.resolve(ASSETS_ROOT, slug), { recursive: true, force: true });
     const ctx = { slug, title, imageIndex: 0, dryRun };
     const body = await renderBlocksMd(await blocksFor(page.id), ctx);
     entries.push({ id: page.id, title, slug, tags, category, summary, date, body });
@@ -260,12 +281,12 @@ async function preparePages(pages, { dryRun }) {
   return entries;
 }
 
-function validateEntries(entries, { allowEmpty }) {
+function validateEntries(entries, { allowEmpty, liveCount, frozenSlugs }) {
   const problems = [];
   const warnings = [];
 
-  if (entries.length === 0 && !allowEmpty) {
-    problems.push('Published 상태의 글이 0건입니다. 상태값/필터를 확인하세요. 의도한 것이라면 ALLOW_EMPTY_SYNC=1 로 실행하세요.');
+  if (liveCount === 0 && !allowEmpty) {
+    problems.push('사이트에 올릴 글(Published·완료)이 0건입니다. 상태값/필터를 확인하세요. 의도한 것이라면 ALLOW_EMPTY_SYNC=1 로 실행하세요.');
   }
 
   const bySlug = new Map();
@@ -277,6 +298,9 @@ function validateEntries(entries, { allowEmpty }) {
     if (titles.length > 1) {
       problems.push(`중복 슬러그 "${slug}" → ${titles.map((t) => JSON.stringify(t)).join(', ')} (노션 '슬러그' 속성으로 구분하세요)`);
     }
+    if (frozenSlugs.has(slug)) {
+      problems.push(`슬러그 "${slug}"가 이미 고정된 '완료' 글과 겹칩니다. 노션 '슬러그' 속성으로 구분하세요.`);
+    }
   }
 
   for (const entry of entries) {
@@ -287,8 +311,8 @@ function validateEntries(entries, { allowEmpty }) {
   return { problems, warnings };
 }
 
-function printPreview(entries) {
-  console.log(`\n📋 배포 대상 미리보기 — Published ${entries.length}건`);
+function printPreview(entries, frozenSlugs) {
+  console.log(`\n📋 배포 대상 미리보기 — 새로 생성 ${entries.length}건 · 고정(완료) ${frozenSlugs.size}건`);
   entries
     .slice()
     .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
@@ -298,24 +322,30 @@ function printPreview(entries) {
       const flag = flags.length ? `  ⚠️ ${flags.join(', ')}` : '';
       console.log(`  ${String(index + 1).padStart(2)}. [${entry.category}] ${entry.title}  (${entry.slug}, ${entry.date})${tags}${flag}`);
     });
+  if (frozenSlugs.size) console.log(`  🔒 고정 유지(완료): ${[...frozenSlugs].join(', ')}`);
 }
 
-async function writeEntries(entries) {
-  const output = path.resolve('src/content/posts');
-  await fs.mkdir(output, { recursive: true });
+async function writeEntries(entries, keepSlugs, outputDir) {
+  await fs.mkdir(outputDir, { recursive: true });
 
-  // 정리 규칙: Notion에서 생성된 글(frontmatter에 notionId 있음) 중 이번 발행 대상이
-  // 아닌 것만 지운다. 직접 작성한 글(notionId 없음, 예: welcome.md)은 보존한다.
-  const keep = new Set(entries.map((entry) => `${entry.slug}.md`));
-  for (const file of await fs.readdir(output)) {
-    if (!file.endsWith('.md') || keep.has(file)) continue;
-    const content = await fs.readFile(path.join(output, file), 'utf8');
-    if (/^notionId:/m.test(content)) await fs.unlink(path.join(output, file));
+  // 정리 규칙: Notion에서 생성된 글(frontmatter에 notionId 있음) 중, 이번에 사이트에
+  // 남겨야 할 글(Published 재생성 + 완료 고정)이 아닌 것만 지운다 — 글과 이미지 자산을 함께.
+  // 직접 작성한 글(notionId 없음, 예: welcome.md)은 항상 보존한다.
+  for (const file of await fs.readdir(outputDir)) {
+    if (!file.endsWith('.md')) continue;
+    const slug = file.replace(/\.md$/, '');
+    if (keepSlugs.has(slug)) continue;
+    const content = await fs.readFile(path.join(outputDir, file), 'utf8');
+    if (/^notionId:/m.test(content)) {
+      await fs.unlink(path.join(outputDir, file));
+      await fs.rm(path.resolve(ASSETS_ROOT, slug), { recursive: true, force: true });
+    }
   }
 
+  // Published 재생성분만 새로 쓴다. 완료 고정 글은 이미 커밋된 파일을 그대로 둔다.
   for (const entry of entries) {
     const frontmatter = `---\ntitle: ${JSON.stringify(entry.title)}\ndescription: ${JSON.stringify(entry.summary)}\ndate: ${entry.date}\ncategory: ${JSON.stringify(entry.category)}\ntags: ${JSON.stringify(entry.tags)}\ndraft: false\nnotionId: ${JSON.stringify(entry.id)}\n---\n\n`;
-    await fs.writeFile(path.join(output, `${entry.slug}.md`), frontmatter + entry.body, 'utf8');
+    await fs.writeFile(path.join(outputDir, `${entry.slug}.md`), frontmatter + entry.body, 'utf8');
   }
 }
 
@@ -329,13 +359,31 @@ async function main() {
     if (!dataSourceId) throw new Error('노션 데이터베이스에서 Data Source를 찾지 못했습니다.');
   }
 
-  const pages = await queryPublishedPages(dataSourceId);
-  // 동기화된 이미지 자산은 매번 새로 내려받는다(실제 쓰기 전, dry-run 제외)
-  if (!dryRun) await fs.rm(path.resolve(ASSETS_ROOT), { recursive: true, force: true });
-  const entries = await preparePages(pages, { dryRun });
-  const { problems, warnings } = validateEntries(entries, { allowEmpty: process.env.ALLOW_EMPTY_SYNC === '1' });
+  const outputDir = path.resolve('src/content/posts');
+  const existingSlugs = await readExistingNotionSlugs(outputDir);
 
-  if (dryRun) printPreview(entries);
+  // Published = 새 글/수정본 → 매번 재생성. 완료 = 확정본 → 이미 커밋된 파일은 재조회 없이 고정.
+  const publishedPages = await queryByStatus(dataSourceId, 'Published');
+  const donePages = await queryByStatus(dataSourceId, '완료');
+
+  const frozenSlugs = new Set();
+  const doneToBake = [];
+  for (const page of donePages) {
+    const slug = slugFor(page);
+    if (existingSlugs.has(slug)) frozenSlugs.add(slug); // 이미 파일이 있으면 재조회 없이 고정
+    else doneToBake.push(page);                          // 파일이 없으면(예: 곧바로 완료) 이번에 한 번만 생성
+  }
+
+  const entries = await preparePages([...publishedPages, ...doneToBake], { dryRun });
+  const keepSlugs = new Set([...entries.map((entry) => entry.slug), ...frozenSlugs]);
+
+  const { problems, warnings } = validateEntries(entries, {
+    allowEmpty: process.env.ALLOW_EMPTY_SYNC === '1',
+    liveCount: keepSlugs.size,
+    frozenSlugs,
+  });
+
+  if (dryRun) printPreview(entries, frozenSlugs);
   for (const warning of warnings) console.warn(`⚠️  ${warning}`);
 
   if (problems.length) {
@@ -345,12 +393,12 @@ async function main() {
   }
 
   if (dryRun) {
-    console.log(`\n🔍 dry-run: 파일을 쓰지 않고 종료합니다. 위 ${entries.length}건이 배포 대상입니다.`);
+    console.log(`\n🔍 dry-run: 파일을 쓰지 않고 종료합니다. 재생성 ${entries.length}건 + 고정(완료) ${frozenSlugs.size}건이 사이트 대상입니다.`);
     return;
   }
 
-  await writeEntries(entries);
-  console.log(`✅ ${entries.length}개의 Published 노션 페이지를 동기화했습니다.`);
+  await writeEntries(entries, keepSlugs, outputDir);
+  console.log(`✅ 동기화 완료 — 재생성 ${entries.length}건, 고정(완료) ${frozenSlugs.size}건 유지.`);
 }
 
 main().catch((error) => {
