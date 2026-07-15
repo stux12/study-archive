@@ -303,7 +303,15 @@ function printPreview(entries) {
 async function writeEntries(entries) {
   const output = path.resolve('src/content/posts');
   await fs.mkdir(output, { recursive: true });
-  await Promise.all((await fs.readdir(output)).filter((file) => file.endsWith('.md') && file !== 'welcome.md').map((file) => fs.unlink(path.join(output, file))));
+
+  // 정리 규칙: Notion에서 생성된 글(frontmatter에 notionId 있음) 중 이번 발행 대상이
+  // 아닌 것만 지운다. 직접 작성한 글(notionId 없음, 예: welcome.md)은 보존한다.
+  const keep = new Set(entries.map((entry) => `${entry.slug}.md`));
+  for (const file of await fs.readdir(output)) {
+    if (!file.endsWith('.md') || keep.has(file)) continue;
+    const content = await fs.readFile(path.join(output, file), 'utf8');
+    if (/^notionId:/m.test(content)) await fs.unlink(path.join(output, file));
+  }
 
   for (const entry of entries) {
     const frontmatter = `---\ntitle: ${JSON.stringify(entry.title)}\ndescription: ${JSON.stringify(entry.summary)}\ndate: ${entry.date}\ncategory: ${JSON.stringify(entry.category)}\ntags: ${JSON.stringify(entry.tags)}\ndraft: false\nnotionId: ${JSON.stringify(entry.id)}\n---\n\n`;
