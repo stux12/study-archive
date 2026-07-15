@@ -7,11 +7,13 @@ const posts = (await getCollection('posts', ({ data }) => !data.draft))
 const categories = [...new Set(posts.map((post) => post.data.category))].sort();
 const tags = [...new Set(posts.flatMap((post) => post.data.tags))].sort((a, b) => a.localeCompare(b, 'ko'));
 
-const GROUP_ORDER = ['백엔드', 'CS·기초', '인프라·DevOps', '프론트엔드'];
-const rank = (g: string) => { const i = GROUP_ORDER.indexOf(g); return i === -1 ? GROUP_ORDER.length : i; };
+// posts는 이미 최신순 정렬 → 분야 등장 순서 = 각 분야 최신 글 순서(최신 분야가 먼저 노출)
 const postsByGroup = [...new Set(posts.map((post) => post.data.group))]
-  .sort((a, b) => rank(a) - rank(b) || a.localeCompare(b, 'ko'))
   .map((group) => ({ group, items: posts.filter((post) => post.data.group === group) }));
+const groupNames = postsByGroup.map(({ group }) => group);
+const categoriesByGroup = Object.fromEntries(
+  postsByGroup.map(({ group, items }) => [group, [...new Set(items.map((post) => post.data.category))].sort()]),
+);
 const baseUrl = import.meta.env.BASE_URL.endsWith('/')
   ? import.meta.env.BASE_URL
   : `${import.meta.env.BASE_URL}/`;
@@ -35,11 +37,18 @@ const pad = (n: number) => String(n).padStart(2, '0');
       <span class="count" id="post-count">{pad(posts.length)}</span>
     </div>
 
-    <div class="filters" aria-label="학습 기록 필터">
+    <div class="filters" aria-label="학습 기록 필터" data-cat-by-group={JSON.stringify(categoriesByGroup)}>
       <label class="search-field">
         <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
         <input id="post-search" type="search" placeholder="제목·요약으로 검색" />
       </label>
+      {groupNames.length > 0 && (
+        <div class="chip-row">
+          <span class="chip-label">FIELD</span>
+          <button class="chip is-selected" type="button" data-group="">전체</button>
+          {groupNames.map((group) => <button class="chip" type="button" data-group={group}>{group}</button>)}
+        </div>
+      )}
       <div class="chip-row">
         <span class="chip-label">CATEGORY</span>
         <button class="chip is-selected" type="button" data-category="">전체</button>
@@ -65,7 +74,7 @@ const pad = (n: number) => String(n).padStart(2, '0');
           </div>
           <div class="post-list">
             {items.map((post) => (
-              <article data-post data-category={post.data.category} data-tags={post.data.tags.join('|')} data-search={`${post.data.title} ${post.data.description} ${post.data.tags.join(' ')}`}>
+              <article data-post data-group={post.data.group} data-category={post.data.category} data-tags={post.data.tags.join('|')} data-search={`${post.data.title} ${post.data.description} ${post.data.tags.join(' ')}`}>
                 <a class="card-link" href={`${baseUrl}posts/${post.id}/`} aria-label={post.data.title}></a>
                 <div class="card-top">
                   <span class="cat">{post.data.category}</span>
@@ -87,10 +96,13 @@ const pad = (n: number) => String(n).padStart(2, '0');
 </BaseLayout>
 
 <script>
+  const filters = document.querySelector<HTMLElement>('.filters');
+  const catByGroup: Record<string, string[]> = JSON.parse(filters?.dataset.catByGroup ?? '{}');
   const search = document.querySelector<HTMLInputElement>('#post-search');
   const count = document.querySelector<HTMLElement>('#post-count');
   const empty = document.querySelector<HTMLElement>('#empty-state');
   const posts = [...document.querySelectorAll<HTMLElement>('[data-post]')];
+  let group = '';
   let category = '';
   let tag = '';
 
@@ -98,7 +110,8 @@ const pad = (n: number) => String(n).padStart(2, '0');
     const keyword = search?.value.trim().toLowerCase() ?? '';
     let visible = 0;
     posts.forEach((post) => {
-      const matches = (!category || post.dataset.category === category)
+      const matches = (!group || post.dataset.group === group)
+        && (!category || post.dataset.category === category)
         && (!tag || post.dataset.tags?.split('|').includes(tag))
         && (!keyword || post.dataset.search?.toLowerCase().includes(keyword));
       post.hidden = !matches;
@@ -112,15 +125,38 @@ const pad = (n: number) => String(n).padStart(2, '0');
     if (empty) empty.hidden = visible > 0;
   };
 
-  document.querySelectorAll<HTMLButtonElement>('[data-category], [data-tag]').forEach((button) => {
+  // 분야 선택 시, 그 분야에 속한 카테고리 칩만 노출(자동 정렬)
+  const categoryChips = [...document.querySelectorAll<HTMLButtonElement>('.chip[data-category]')];
+  const refreshCategoryChips = () => {
+    const allowed = group ? (catByGroup[group] ?? []) : null;
+    categoryChips.forEach((chip) => {
+      const cat = chip.dataset.category ?? '';
+      const show = cat === '' || !allowed || allowed.includes(cat);
+      chip.hidden = !show;
+      if (!show && cat === category) category = '';
+    });
+    categoryChips.forEach((chip) => chip.classList.toggle('is-selected', (chip.dataset.category ?? '') === category));
+  };
+
+  document.querySelectorAll<HTMLButtonElement>('.chip[data-group]').forEach((button) => {
     button.addEventListener('click', () => {
-      if (button.dataset.category !== undefined) {
-        category = button.dataset.category;
-        document.querySelectorAll('[data-category]').forEach((item) => item.classList.toggle('is-selected', item === button));
-      } else {
-        tag = button.dataset.tag ?? '';
-        document.querySelectorAll('[data-tag]').forEach((item) => item.classList.toggle('is-selected', item === button));
-      }
+      group = button.dataset.group ?? '';
+      document.querySelectorAll<HTMLButtonElement>('.chip[data-group]').forEach((item) => item.classList.toggle('is-selected', item === button));
+      refreshCategoryChips();
+      update();
+    });
+  });
+  categoryChips.forEach((button) => {
+    button.addEventListener('click', () => {
+      category = button.dataset.category ?? '';
+      categoryChips.forEach((item) => item.classList.toggle('is-selected', item === button));
+      update();
+    });
+  });
+  document.querySelectorAll<HTMLButtonElement>('.chip[data-tag]').forEach((button) => {
+    button.addEventListener('click', () => {
+      tag = button.dataset.tag ?? '';
+      document.querySelectorAll<HTMLButtonElement>('.chip[data-tag]').forEach((item) => item.classList.toggle('is-selected', item === button));
       update();
     });
   });
