@@ -1,6 +1,8 @@
 node_modules/
 dist/
 .astro/
+# 동기화로 생성되는 이미지 자산(빌드 때 Notion에서 내려받음)
+src/assets/posts/
 .env
 .env.*
 !.env.example

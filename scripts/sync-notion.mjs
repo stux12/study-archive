@@ -23,10 +23,50 @@ const api = async (url, options = {}) => {
   if (!response.ok) throw new Error(`Notion API ${response.status}: ${await response.text()}`);
   return response.json();
 };
-const text = (items = []) => items.map((item) => item.plain_text ?? item.text?.content ?? '').join('');
-const slugify = (value) => value.toLowerCase().trim().replace(/[^a-z0-9가-힣]+/gi, '-').replace(/^-|-$/g, '') || 'untitled';
-const value = (page, name, kind) => page.properties[name]?.[kind];
 
+const ASSETS_ROOT = 'src/assets/posts';
+
+const value = (page, name, kind) => page.properties[name]?.[kind];
+const slugify = (v) => v.toLowerCase().trim().replace(/[^a-z0-9가-힣]+/gi, '-').replace(/^-|-$/g, '') || 'untitled';
+
+// ── 리치 텍스트 렌더 ──────────────────────────────────────────
+const plain = (items = []) => (items || []).map((i) => i.plain_text ?? i.text?.content ?? '').join('');
+const escapeHtml = (s = '') => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const escapeAttr = (s = '') => escapeHtml(s).replace(/"/g, '&quot;');
+
+function richMd(items = []) {
+  return (items || []).map((i) => {
+    let s = i.plain_text ?? i.text?.content ?? '';
+    if (!s) return '';
+    const a = i.annotations || {};
+    if (a.code) { s = '`' + s + '`'; }
+    else {
+      if (a.bold) s = `**${s}**`;
+      if (a.italic) s = `*${s}*`;
+      if (a.strikethrough) s = `~~${s}~~`;
+    }
+    const href = i.href || i.text?.link?.url;
+    return href ? `[${s}](${href})` : s;
+  }).join('');
+}
+
+function richHtml(items = []) {
+  return (items || []).map((i) => {
+    let s = escapeHtml(i.plain_text ?? i.text?.content ?? '');
+    if (!s) return '';
+    const a = i.annotations || {};
+    if (a.code) { s = `<code>${s}</code>`; }
+    else {
+      if (a.bold) s = `<strong>${s}</strong>`;
+      if (a.italic) s = `<em>${s}</em>`;
+      if (a.strikethrough) s = `<s>${s}</s>`;
+    }
+    const href = i.href || i.text?.link?.url;
+    return href ? `<a href="${escapeAttr(href)}">${s}</a>` : s;
+  }).join('');
+}
+
+// ── 블록 조회 ────────────────────────────────────────────────
 async function blocksFor(blockId) {
   const blocks = [];
   let cursor;
@@ -39,25 +79,157 @@ async function blocksFor(blockId) {
   return blocks;
 }
 
-function blockToMarkdown(block) {
+// ── 이미지 다운로드(만료 URL 방지) ───────────────────────────
+function extFromUrl(url, contentType) {
+  const m = url.split('?')[0].match(/\.(png|jpe?g|gif|webp|svg|avif)$/i);
+  if (m) return m[1].toLowerCase() === 'jpeg' ? 'jpg' : m[1].toLowerCase();
+  const ct = (contentType || '').toLowerCase();
+  if (ct.includes('png')) return 'png';
+  if (ct.includes('jpeg') || ct.includes('jpg')) return 'jpg';
+  if (ct.includes('gif')) return 'gif';
+  if (ct.includes('webp')) return 'webp';
+  if (ct.includes('svg')) return 'svg';
+  if (ct.includes('avif')) return 'avif';
+  return 'png';
+}
+
+async function downloadImage(url, ctx) {
+  if (ctx.dryRun) { ctx.imageIndex += 1; return `../../assets/posts/${ctx.slug}/${String(ctx.imageIndex).padStart(2, '0')}.png`; }
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`이미지 다운로드 실패 ${res.status}`);
+  const buf = Buffer.from(await res.arrayBuffer());
+  ctx.imageIndex += 1;
+  const file = `${String(ctx.imageIndex).padStart(2, '0')}.${extFromUrl(url, res.headers.get('content-type'))}`;
+  const dir = path.resolve(ASSETS_ROOT, ctx.slug);
+  await fs.mkdir(dir, { recursive: true });
+  await fs.writeFile(path.join(dir, file), buf);
+  return `../../assets/posts/${ctx.slug}/${file}`;
+}
+
+// ── HTML 컨텍스트(콜아웃/토글 내부) ──────────────────────────
+async function renderBlocksHtml(blocks, ctx) {
+  let html = '';
+  let i = 0;
+  while (i < blocks.length) {
+    const type = blocks[i].type;
+    if (type === 'bulleted_list_item' || type === 'numbered_list_item') {
+      const tag = type === 'bulleted_list_item' ? 'ul' : 'ol';
+      let items = '';
+      while (i < blocks.length && blocks[i].type === type) {
+        items += `<li>${richHtml(blocks[i][type].rich_text)}</li>`;
+        i += 1;
+      }
+      html += `<${tag}>${items}</${tag}>`;
+    } else {
+      html += await renderBlockHtml(blocks[i], ctx);
+      i += 1;
+    }
+  }
+  return html;
+}
+
+async function renderBlockHtml(block, ctx) {
   const type = block.type;
   const data = block[type] || {};
-  const content = text(data.rich_text);
+  const content = richHtml(data.rich_text);
+  if (type === 'paragraph') return content ? `<p>${content}</p>` : '';
+  if (type === 'heading_1' || type === 'heading_2' || type === 'heading_3') return `<p><strong>${content}</strong></p>`;
+  if (type === 'to_do') return `<p>${data.checked ? '☑' : '☐'} ${content}</p>`;
+  if (type === 'quote') return `<blockquote>${content}</blockquote>`;
+  if (type === 'code') return `<pre><code>${escapeHtml(plain(data.rich_text))}</code></pre>`;
+  if (type === 'callout') return await renderCallout(block, ctx);
+  if (type === 'toggle') return await renderToggle(block, ctx);
+  if (type === 'image') return `<p><em>🖼 ${escapeHtml(plain(data.caption) || '이미지')}</em></p>`;
+  return content ? `<p>${content}</p>` : '';
+}
+
+// ── 콜아웃 / 토글 / 표 / 이미지 ──────────────────────────────
+function calloutTone(color = '') {
+  if (/green/.test(color)) return 'tip';
+  if (/red|orange|yellow|pink|brown/.test(color)) return 'warn';
+  return 'note';
+}
+
+async function renderCallout(block, ctx) {
+  const data = block.callout;
+  const icon = data.icon?.type === 'emoji' ? data.icon.emoji : '💡';
+  let inner = richHtml(data.rich_text) ? `<p>${richHtml(data.rich_text)}</p>` : '';
+  if (block.has_children) inner += await renderBlocksHtml(await blocksFor(block.id), ctx);
+  return `<aside class="callout callout--${calloutTone(data.color)}"><span class="callout-icon" aria-hidden="true">${icon}</span><div class="callout-body">${inner}</div></aside>`;
+}
+
+async function renderToggle(block, ctx) {
+  const data = block.toggle;
+  const summary = richHtml(data.rich_text) || '자세히 보기';
+  const inner = block.has_children ? await renderBlocksHtml(await blocksFor(block.id), ctx) : '';
+  return `<details class="toggle"><summary>${summary}</summary><div class="toggle-body">${inner}</div></details>`;
+}
+
+async function renderTable(block) {
+  const rows = block.has_children ? await blocksFor(block.id) : [];
+  const header = block.table?.has_column_header;
+  let body = '';
+  rows.forEach((row, index) => {
+    if (row.type !== 'table_row') return;
+    const cells = row.table_row.cells || [];
+    const tag = header && index === 0 ? 'th' : 'td';
+    body += `<tr>${cells.map((c) => `<${tag}>${richHtml(c)}</${tag}>`).join('')}</tr>`;
+  });
+  return `<div class="table-wrap"><table>${body}</table></div>`;
+}
+
+async function renderImage(block, ctx) {
+  const data = block.image;
+  const url = data.type === 'external' ? data.external?.url : data.file?.url;
+  if (!url) return '';
+  const caption = plain(data.caption);
+  const src = await downloadImage(url, ctx);
+  const alt = (caption || ctx.title).replace(/[[\]]/g, '');
+  const img = `![${alt}](${src})`;
+  return caption ? `${img}\n\n<span class="figcaption">${escapeHtml(caption)}</span>\n` : `${img}\n`;
+}
+
+// ── Markdown 컨텍스트(문서 본문) ─────────────────────────────
+async function renderBlocksMd(blocks, ctx) {
+  const parts = [];
+  for (const block of blocks) parts.push(await renderBlockMd(block, ctx));
+  return parts.filter((p) => p !== '').join('\n');
+}
+
+async function listItemMd(block, ctx, marker) {
+  const data = block[block.type];
+  let out = `${marker} ${richMd(data.rich_text)}\n`;
+  if (block.has_children) {
+    const child = await renderBlocksMd(await blocksFor(block.id), ctx);
+    out += child.split('\n').map((l) => (l ? `  ${l}` : l)).join('\n') + '\n';
+  }
+  return out;
+}
+
+async function renderBlockMd(block, ctx) {
+  const type = block.type;
+  const data = block[type] || {};
+  const content = richMd(data.rich_text);
   if (type === 'paragraph') return content ? `${content}\n` : '';
   if (type === 'heading_1') return `# ${content}\n`;
   if (type === 'heading_2') return `## ${content}\n`;
   if (type === 'heading_3') return `### ${content}\n`;
-  if (type === 'bulleted_list_item') return `- ${content}\n`;
-  if (type === 'numbered_list_item') return `1. ${content}\n`;
+  if (type === 'bulleted_list_item') return await listItemMd(block, ctx, '-');
+  if (type === 'numbered_list_item') return await listItemMd(block, ctx, '1.');
   if (type === 'to_do') return `- [${data.checked ? 'x' : ' '}] ${content}\n`;
   if (type === 'quote') return `> ${content}\n`;
-  if (type === 'code') return `\`\`\`${data.language || ''}\n${content}\n\`\`\`\n`;
+  if (type === 'code') return `\`\`\`${data.language || ''}\n${plain(data.rich_text)}\n\`\`\`\n`;
   if (type === 'divider') return '---\n';
-  if (type === 'bookmark') return `[${data.caption ? text(data.caption) : data.url}](${data.url})\n`;
-  if (type === 'callout') return `> ${content}\n`;
+  if (type === 'bookmark') return `[${data.caption ? plain(data.caption) : data.url}](${data.url})\n`;
+  if (type === 'callout') return `${await renderCallout(block, ctx)}\n`;
+  if (type === 'toggle') return `${await renderToggle(block, ctx)}\n`;
+  if (type === 'table') return `${await renderTable(block)}\n`;
+  if (type === 'image') return await renderImage(block, ctx);
+  if (block.has_children) return await renderBlocksMd(await blocksFor(block.id), ctx);
   return content ? `${content}\n` : '';
 }
 
+// ── 페이지 조회 / 준비 / 검증 ────────────────────────────────
 async function queryPublishedPages(dataSourceId) {
   const pages = [];
   let cursor;
@@ -72,34 +244,30 @@ async function queryPublishedPages(dataSourceId) {
   return pages;
 }
 
-// 노션 페이지를 사이트에 쓰기 좋은 형태로 정리한다(본문 blocks 포함).
-async function preparePages(pages) {
+async function preparePages(pages, { dryRun }) {
   const entries = [];
   for (const page of pages) {
-    const title = text(value(page, property.title, 'title')) || '제목 없음';
-    const slug = value(page, property.slug, 'rich_text')?.length ? slugify(text(value(page, property.slug, 'rich_text'))) : slugify(title);
+    const title = plain(value(page, property.title, 'title')) || '제목 없음';
+    const slug = value(page, property.slug, 'rich_text')?.length ? slugify(plain(value(page, property.slug, 'rich_text'))) : slugify(title);
     const tags = (value(page, property.tags, 'multi_select') || []).map((tag) => tag.name);
     const category = value(page, property.category, 'select')?.name || '미분류';
-    const summary = text(value(page, property.summary, 'rich_text'));
+    const summary = plain(value(page, property.summary, 'rich_text'));
     const date = value(page, property.date, 'date')?.start || page.last_edited_time.slice(0, 10);
-    const blocks = await blocksFor(page.id);
-    const body = blocks.map(blockToMarkdown).join('\n');
+    const ctx = { slug, title, imageIndex: 0, dryRun };
+    const body = await renderBlocksMd(await blocksFor(page.id), ctx);
     entries.push({ id: page.id, title, slug, tags, category, summary, date, body });
   }
   return entries;
 }
 
-// 발행 안전장치: 배포로 넘어가기 전에 조용한 데이터 손실을 막는다.
 function validateEntries(entries, { allowEmpty }) {
   const problems = [];
   const warnings = [];
 
-  // (1) 0건 가드: 상태값 오타/필터 문제로 전체 글이 지워지는 사고 방지
   if (entries.length === 0 && !allowEmpty) {
     problems.push('Published 상태의 글이 0건입니다. 상태값/필터를 확인하세요. 의도한 것이라면 ALLOW_EMPTY_SYNC=1 로 실행하세요.');
   }
 
-  // (2) 중복 슬러그: 같은 파일명으로 저장돼 한 글이 조용히 덮어써지는 것 차단
   const bySlug = new Map();
   for (const entry of entries) {
     if (!bySlug.has(entry.slug)) bySlug.set(entry.slug, []);
@@ -111,7 +279,6 @@ function validateEntries(entries, { allowEmpty }) {
     }
   }
 
-  // (3) 경고: 발행은 막지 않되 품질 문제를 드러낸다
   for (const entry of entries) {
     if (!entry.summary.trim()) warnings.push(`요약 없음: ${JSON.stringify(entry.title)} (${entry.slug})`);
     if (!entry.body.trim()) warnings.push(`본문이 비어 있음: ${JSON.stringify(entry.title)} (${entry.slug})`);
@@ -120,7 +287,6 @@ function validateEntries(entries, { allowEmpty }) {
   return { problems, warnings };
 }
 
-// 배포 전에 어떤 글이 실제로 나갈지 사람이 눈으로 확인하기 위한 미리보기.
 function printPreview(entries) {
   console.log(`\n📋 배포 대상 미리보기 — Published ${entries.length}건`);
   entries
@@ -156,11 +322,12 @@ async function main() {
   }
 
   const pages = await queryPublishedPages(dataSourceId);
-  const entries = await preparePages(pages);
+  // 동기화된 이미지 자산은 매번 새로 내려받는다(실제 쓰기 전, dry-run 제외)
+  if (!dryRun) await fs.rm(path.resolve(ASSETS_ROOT), { recursive: true, force: true });
+  const entries = await preparePages(pages, { dryRun });
   const { problems, warnings } = validateEntries(entries, { allowEmpty: process.env.ALLOW_EMPTY_SYNC === '1' });
 
   if (dryRun) printPreview(entries);
-
   for (const warning of warnings) console.warn(`⚠️  ${warning}`);
 
   if (problems.length) {
