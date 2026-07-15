@@ -1,47 +1,83 @@
-# 공부 아카이브
+# 학습 아카이브 (Study Archive)
 
-대화형 AI로 만든 학습 초안을 노션에서 검수하고, **원할 때만** GitHub Actions에서 GitHub Pages로 발행하는 정적 사이트입니다.
+Notion에서 작성·검수한 학습 기록을, **원할 때만** GitHub Actions로 GitHub Pages에 발행하는 정적 사이트입니다. 작성은 익숙한 Notion에서, 공개는 빠르고 안정적인 정적 사이트로 분리했습니다. (Astro 기반)
 
-## 작동 방식
+- 라이브: https://stux12.github.io/study-archive/
 
-1. AI에게 학습 내용을 정리하게 한 뒤 노션 데이터베이스에 저장합니다.
-2. 직접 읽고 수정합니다. [발행 검수 체크리스트](docs/publish-review-checklist.md)를 통과한 글만 상태를 `Published`로 변경합니다.
-3. GitHub의 **Actions → Notion 검수본 배포 → Run workflow**를 누릅니다. `dry_run`을 켜면 배포 대상 글 목록만 미리 확인할 수 있습니다.
-4. 워크플로가 `Published` 글만 가져와 사이트를 빌드하고 배포합니다. 중복 슬러그·0건 동기화는 자동으로 차단됩니다.
+## 작동 방식 — 상태 기반 발행
 
-`Draft`, `Review` 등 다른 상태의 글은 절대 동기화하지 않습니다.
+Notion 글의 **상태(Status)** 로 사이트 노출을 제어합니다.
+
+| 상태 | 동작 |
+| --- | --- |
+| `시작 전` / `진행 중` | 초안. 사이트에 올라가지 않음 |
+| `Published` | 발행 대상. 실행할 때마다 Notion에서 **다시 생성**하고 저장소에 커밋 |
+| `완료` | 확정본. 이미 커밋된 파일을 **재조회 없이 그대로 고정** |
+| 행 삭제 / 초안으로 전환 | 다음 실행 때 사이트에서 **제거** |
+| 직접 작성 글 (`notionId` 없음) | 항상 **보존** |
+
+발행 순서:
+
+1. Notion 데이터베이스에 글을 작성합니다.
+2. 직접 읽고 수정한 뒤, [발행 검수 체크리스트](docs/publish-review-checklist.md)를 통과한 글의 상태를 `Published`로 바꿉니다.
+3. GitHub **Actions → Notion 검수본 배포 → Run workflow** 를 실행합니다. `dry_run`을 켜면 실제 배포 없이 발행 대상 목록만 미리 볼 수 있습니다.
+4. 워크플로가 동기화 → 생성물 커밋 → 빌드 → 배포를 수행합니다. 중복 슬러그·0건 동기화는 자동 차단됩니다.
+
+배포 트리거는 수동(`workflow_dispatch`)뿐입니다. Notion에서 상태를 바꿔도 워크플로를 실행하기 전에는 사이트가 바뀌지 않습니다 — 오발행을 막는 안전장치입니다.
+
+## 커밋백(commit-back) 발행 모델
+
+GitHub Actions는 매 실행마다 저장소를 새로 체크아웃하는 **무상태** 환경입니다. 그래서 "확정된 글은 다시 건드리지 않고 고정"하려면 생성물을 어딘가에 영속화해야 합니다.
+
+이 프로젝트는 워크플로가 생성한 글(`src/content/posts`)과 이미지(`src/assets/posts`)를 **저장소에 커밋**해 보존합니다.
+
+- `Published` 글: 매 실행 재생성 후 커밋
+- `완료` 글: 이미 커밋된 파일을 그대로 유지(재조회하지 않음 → 수정해도 반영되지 않음. 다시 바꾸려면 `Published`로 되돌린 뒤 실행)
+- 사이트에 남을 글이 아닌 `notionId` 파일만 이미지 자산과 함께 삭제하며, 직접 작성한 글은 삭제하지 않습니다.
+
+## 콘텐츠 변환
+
+Notion 블록을 정적 사이트용 Markdown/HTML로 변환합니다. 지원 대상:
+
+- 제목, 문단, 목록, 할 일, 인용문, 코드 블록, 구분선, 북마크
+- **콜아웃**, **토글(details)**, **표**
+- **Mermaid 다이어그램** — 코드 블록 언어를 `mermaid`로 지정하면 사이트에서 다이어그램으로 렌더됩니다
+- **이미지** — Notion의 이미지 URL은 만료되므로, 내려받아 저장소 자산으로 보관합니다
+- 인라인 서식(굵게, 기울임, 취소선, 코드, 링크)
+
+## 분류 체계 (3단계)
+
+`분야`(대분류) → `카테고리`(중분류) → `태그`(키워드) 로 글을 묶고, 메인 목록은 **분야별 섹션**으로 그룹핑되며 클라이언트 검색·필터를 제공합니다.
 
 ## 노션 데이터베이스 준비
 
-아래 속성을 만드세요. 한글 이름을 바꾸고 싶다면 GitHub Repository Variables에 같은 이름의 환경 변수를 설정하면 됩니다.
+아래 속성을 만드세요. 한글 이름을 바꾸고 싶다면 GitHub Repository Variables에 대응하는 환경 변수를 설정하면 됩니다.
 
-| 이름 | Notion 속성 유형 | 필수 |
-| --- | --- | --- |
-| 제목 | Title | 예 |
-| 상태 | Status (`Published` 옵션 필요) | 예 |
-| 태그 | Multi-select | 아니오 |
-| 카테고리 | Select | 아니오 |
-| 슬러그 | Text | 아니오 |
-| 요약 | Text | 아니오 |
-| 학습일 | Date | 아니오 |
+| 이름 | Notion 속성 유형 | 필수 | 환경 변수 |
+| --- | --- | --- | --- |
+| 제목 | Title | 예 | `NOTION_TITLE_PROPERTY` |
+| 상태 | Status (`Published`·`완료` 옵션 필요) | 예 | `NOTION_STATUS_PROPERTY` |
+| 분야 | Select (대분류) | 아니오 | `NOTION_GROUP_PROPERTY` |
+| 카테고리 | Select | 아니오 | `NOTION_CATEGORY_PROPERTY` |
+| 태그 | Multi-select | 아니오 | `NOTION_TAGS_PROPERTY` |
+| 슬러그 | Text | 아니오 | `NOTION_SLUG_PROPERTY` |
+| 요약 | Text | 아니오 | `NOTION_SUMMARY_PROPERTY` |
+| 학습일 | Date | 아니오 | `NOTION_DATE_PROPERTY` |
 
-노션 본문은 제목, 문단, 목록, 할 일, 인용문, 코드 블록, 구분선, 북마크를 Markdown으로 변환합니다. 이미지·복잡한 데이터베이스 블록은 초기 버전에서 변환 대상이 아닙니다.
-
-속성 생성, 상태 흐름, 새 글 템플릿은 [노션 데이터베이스 템플릿](docs/notion-database-template.md)을 그대로 따라 하면 됩니다.
+속성 생성, 상태 흐름, 새 글 템플릿은 [노션 데이터베이스 템플릿](docs/notion-database-template.md)을 따라 하면 됩니다. 시각 자료 작성 규칙은 [콘텐츠·시각자료 정책](docs/content-visual-policy.md)을 참고하세요.
 
 ## GitHub 설정
 
-1. 이 폴더 자체를 새 GitHub 저장소로 올립니다.
-2. 저장소 **Settings → Pages → Source**에서 **GitHub Actions**를 선택합니다.
-3. 저장소 **Settings → Secrets and variables → Actions → Secrets**에 다음을 추가합니다.
+1. 이 폴더를 새 GitHub 저장소로 올립니다.
+2. 저장소 **Settings → Pages → Source** 에서 **GitHub Actions** 를 선택합니다.
+3. 저장소 **Settings → Secrets and variables → Actions → Secrets** 에 다음을 추가합니다.
    - `NOTION_TOKEN`: Notion Internal integration secret
-   - `NOTION_DATABASE_ID`: 노션 데이터베이스 URL에 있는 32자리 Database ID
-4. Notion 연결에 해당 데이터베이스 읽기 권한을 부여합니다.
-5. Actions 탭에서 `Notion 검수본 배포`를 수동 실행합니다.
+   - `NOTION_DATABASE_ID`: 노션 데이터베이스 ID (또는 특정 데이터 소스를 직접 지정하려면 `NOTION_DATA_SOURCE_ID`)
+4. Notion 연결(integration)에 해당 데이터베이스 읽기 권한을 부여합니다.
+5. 커밋백을 위해 **Settings → Actions → General → Workflow permissions** 가 **Read and write permissions** 인지 확인합니다.
+6. Actions 탭에서 `Notion 검수본 배포`를 수동 실행합니다.
 
-토큰은 로컬 `.env`나 GitHub Secrets에만 보관합니다. 정적 사이트와 Git 저장소에는 넣지 않습니다.
-
-저장소 생성부터 최초 배포까지는 [GitHub Pages 체크리스트](docs/github-publish-checklist.md)를 참고하세요.
+토큰은 로컬 `.env`나 GitHub Secrets에만 보관하며, 소스 코드와 Git 저장소에는 넣지 않습니다. 저장소 생성부터 최초 배포까지는 [GitHub Pages 체크리스트](docs/github-publish-checklist.md)를 참고하세요.
 
 ## 로컬 실행
 
@@ -55,18 +91,25 @@ npm run dev
 ```powershell
 $env:NOTION_TOKEN = 'secret_xxx'
 $env:NOTION_DATABASE_ID = '...'
-npm run sync:notion
+npm run sync:notion            # Published·완료 글을 로컬 src/content/posts로 생성
+npm run sync:notion -- --dry-run   # 파일을 쓰지 않고 발행 대상만 출력
 npm run build
 ```
 
-## AI 입력 템플릿
+## AI로 초안 작성하기
 
-대화형 AI에 아래처럼 요청하면 결과를 노션 페이지 본문에 붙여넣기 좋습니다.
+대화형 AI에 아래처럼 요청하면 결과를 Notion 페이지 본문에 붙여넣기 좋습니다. 학습 글의 표준 구조입니다.
 
 ```text
 아래 학습 메모를 노션 학습 기록으로 정리해줘.
-사실과 추측을 구분하고, 출처가 없으면 출처가 없다고 표시해줘.
-형식: 한 줄 요약 / 왜 중요한가 / 핵심 개념 / 예시 / 헷갈린 점 / 복습 질문 / 참고 자료
+초보자 눈높이로, 어려운 용어는 쉬운 설명·비유를 곁들여줘.
+사실과 추측을 구분하고, 출처가 없으면 없다고 표시해줘.
+Mermaid 다이어그램·콜아웃·표를 적극 활용해줘.
+
+형식:
+한 줄 요약 / 왜 중요한가 / 핵심 개념(+시각자료) / 예제 / 함정과 방지책 / 내가 다시 설명한다면
 
 [여기에 메모 또는 링크]
 ```
+
+`내가 다시 설명한다면`은 정리된 글을 읽고 스스로의 언어·비유로 채우는 칸입니다.
