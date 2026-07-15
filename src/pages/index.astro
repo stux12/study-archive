@@ -25,10 +25,16 @@ const pad = (n: number) => String(n).padStart(2, '0');
   <section class="hero">
     <p class="eyebrow">// LEARNING LOG</p>
     <h1>새롭게 알게 된 정보를<br />내 것으로 만들기 위해<br />다시 정리하는 공간</h1>
-    <blockquote class="hero-quote">
-      <p>“나는 아직도 배우고 있다.”</p>
-      <cite>미켈란젤로</cite>
-    </blockquote>
+    <div class="hero-quotes">
+      <blockquote class="hero-quote">
+        <p>“나는 아직도 배우고 있다.”</p>
+        <cite>미켈란젤로</cite>
+      </blockquote>
+      <blockquote class="hero-quote">
+        <p>“나는 그만 배우고 싶다. 근데 배울 게 너무 많다.”</p>
+        <cite>김진환</cite>
+      </blockquote>
+    </div>
   </section>
 
   <section aria-labelledby="posts-title">
@@ -153,7 +159,8 @@ const pad = (n: number) => String(n).padStart(2, '0');
   .hero { padding: 36px 0 56px; max-width: 42rem; }
   .eyebrow { margin: 0 0 16px; font-family: var(--mono); color: var(--accent); font-weight: 600; font-size: .78rem; letter-spacing: .04em; }
   .hero h1 { margin: 0; font-size: clamp(1.95rem, 1.2rem + 2.9vw, 3rem); font-weight: 800; letter-spacing: -.035em; line-height: 1.24; }
-  .hero-quote { margin: 28px 0 0; padding: 3px 0 3px 18px; max-width: 33rem; border-left: 2px solid color-mix(in srgb, var(--accent) 50%, var(--border-strong)); }
+  .hero-quotes { margin-top: 28px; display: flex; flex-wrap: wrap; gap: 20px 32px; }
+  .hero-quote { margin: 0; padding: 3px 0 3px 18px; flex: 1 1 15rem; max-width: 33rem; border-left: 2px solid color-mix(in srgb, var(--accent) 50%, var(--border-strong)); }
   .hero-quote p { margin: 0; color: var(--heading); font-size: 1.16rem; line-height: 1.55; font-weight: 500; }
   .hero-quote cite { display: block; margin-top: 9px; font-family: var(--mono); font-style: normal; color: var(--muted); font-size: .78rem; letter-spacing: .02em; }
   .hero-quote cite::before { content: '— '; color: var(--faint); }
