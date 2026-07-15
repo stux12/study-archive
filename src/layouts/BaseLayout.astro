@@ -86,6 +86,26 @@ const fontHref = 'https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist
         localStorage.setItem('theme', next);
       });
     </script>
+
+    <script>
+      // Mermaid 다이어그램은 있는 페이지에서만 동적 로드(코드 분할)
+      (async () => {
+        const blocks = Array.from(document.querySelectorAll<HTMLElement>('pre.mermaid'));
+        if (!blocks.length) return;
+        const { default: mermaid } = await import('mermaid');
+        blocks.forEach((el) => { el.dataset.src = el.textContent || ''; });
+        const themeName = () => (document.documentElement.dataset.theme === 'dark' ? 'dark' : 'default');
+        const render = async () => {
+          mermaid.initialize({ startOnLoad: false, theme: themeName(), securityLevel: 'strict', fontFamily: 'inherit' });
+          for (const el of blocks) { el.removeAttribute('data-processed'); el.innerHTML = el.dataset.src || ''; }
+          try { await mermaid.run({ nodes: blocks }); } catch (e) { console.error('mermaid', e); }
+        };
+        await render();
+        let timer = 0;
+        new MutationObserver(() => { clearTimeout(timer); timer = window.setTimeout(render, 80); })
+          .observe(document.documentElement, { attributeFilter: ['data-theme'] });
+      })();
+    </script>
   </body>
 </html>
 <style is:global>
@@ -243,6 +263,10 @@ const fontHref = 'https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist
   /* 표(가로 스크롤 안전) */
   .prose .table-wrap { overflow-x: auto; margin: 1.6em 0; }
   .prose .table-wrap table { margin: 0; }
+
+  /* Mermaid 다이어그램(코드블록 스타일 초기화) */
+  .prose pre.mermaid { margin: 1.6em 0; padding: 8px 0; background: transparent; border: 0; box-shadow: none; text-align: center; overflow-x: auto; color: var(--muted); }
+  .prose pre.mermaid svg { max-width: 100%; height: auto; }
   code { background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; padding: .1em .4em; font-family: var(--mono); font-size: .84em; color: var(--heading); }
   pre { margin: 1.5em 0; padding: 20px 22px; overflow-x: auto; border-radius: var(--r); background: var(--code-bg); color: var(--code-text); box-shadow: var(--shadow); border: 1px solid color-mix(in srgb, var(--code-text) 10%, transparent); line-height: 1.62; font-size: .9rem; }
   pre code { background: transparent; border: 0; padding: 0; color: inherit; font-size: .86rem; }
