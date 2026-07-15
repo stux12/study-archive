@@ -19,6 +19,8 @@
 - [ ] **카테고리·태그**: 분류가 맞는가? 필터에서 잘 잡히는가?
 - [ ] **학습일**: 목록 정렬 기준이 되므로 실제 날짜인가?
 - [ ] **본문**: 코드 블록·인용·표가 깨지지 않는가? 민감정보(토큰/키/사내자료)가 없는가?
+- [ ] **시각자료**: 핵심 개념에 다이어그램·그림·표가 **1개 이상** 있는가? ([콘텐츠·시각자료 정책](content-visual-policy.md))
+- [ ] **이미지**: alt 텍스트가 있는가? Notion 원본 URL(만료됨)이 아니라 동기화된 로컬 이미지인가? 용량이 과하지 않은가?
 
 ## 2. 자동으로 걸러지는 것 (동기화 스크립트)
 
@@ -42,5 +44,6 @@
 
 ## 관련 문서
 
+- 콘텐츠·시각자료 정책: [content-visual-policy.md](content-visual-policy.md)
 - 상태 체계·속성 정의: [notion-database-template.md](notion-database-template.md)
 - 최초 배포 설정: [github-publish-checklist.md](github-publish-checklist.md)
