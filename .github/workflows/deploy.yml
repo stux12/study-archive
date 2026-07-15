@@ -48,6 +48,7 @@ jobs:
           NOTION_STATUS_PROPERTY: ${{ vars.NOTION_STATUS_PROPERTY || '상태' }}
           NOTION_TAGS_PROPERTY: ${{ vars.NOTION_TAGS_PROPERTY || '태그' }}
           NOTION_CATEGORY_PROPERTY: ${{ vars.NOTION_CATEGORY_PROPERTY || '카테고리' }}
+          NOTION_GROUP_PROPERTY: ${{ vars.NOTION_GROUP_PROPERTY || '분야' }}
           NOTION_SLUG_PROPERTY: ${{ vars.NOTION_SLUG_PROPERTY || '슬러그' }}
           NOTION_SUMMARY_PROPERTY: ${{ vars.NOTION_SUMMARY_PROPERTY || '요약' }}
           NOTION_DATE_PROPERTY: ${{ vars.NOTION_DATE_PROPERTY || '학습일' }}

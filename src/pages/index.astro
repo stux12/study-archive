@@ -6,6 +6,12 @@ const posts = (await getCollection('posts', ({ data }) => !data.draft))
   .sort((a, b) => b.data.date.getTime() - a.data.date.getTime());
 const categories = [...new Set(posts.map((post) => post.data.category))].sort();
 const tags = [...new Set(posts.flatMap((post) => post.data.tags))].sort((a, b) => a.localeCompare(b, 'ko'));
+
+const GROUP_ORDER = ['백엔드', 'CS·기초', '인프라·DevOps', '프론트엔드'];
+const rank = (g: string) => { const i = GROUP_ORDER.indexOf(g); return i === -1 ? GROUP_ORDER.length : i; };
+const postsByGroup = [...new Set(posts.map((post) => post.data.group))]
+  .sort((a, b) => rank(a) - rank(b) || a.localeCompare(b, 'ko'))
+  .map((group) => ({ group, items: posts.filter((post) => post.data.group === group) }));
 const baseUrl = import.meta.env.BASE_URL.endsWith('/')
   ? import.meta.env.BASE_URL
   : `${import.meta.env.BASE_URL}/`;
@@ -50,21 +56,31 @@ const pad = (n: number) => String(n).padStart(2, '0');
 
     <p id="empty-state" hidden>조건에 맞는 발행 기록이 없습니다.</p>
 
-    <div class="post-list" aria-live="polite">
-      {posts.map((post) => (
-        <article data-post data-category={post.data.category} data-tags={post.data.tags.join('|')} data-search={`${post.data.title} ${post.data.description} ${post.data.tags.join(' ')}`}>
-          <a class="card-link" href={`${baseUrl}posts/${post.id}/`} aria-label={post.data.title}></a>
-          <div class="card-top">
-            <span class="cat">{post.data.category}</span>
-            <span class="sep">/</span>
-            <time class="date">{fmt(post.data.date)}</time>
+    <div class="groups" aria-live="polite">
+      {postsByGroup.map(({ group, items }) => (
+        <section class="group-block" data-group-block={group}>
+          <div class="group-head">
+            <h3 class="group-title">{group}</h3>
+            <span class="group-count">{pad(items.length)}</span>
           </div>
-          <h3>{post.data.title}</h3>
-          {post.data.description && <p class="desc">{post.data.description}</p>}
-          {post.data.tags.length > 0 && (
-            <div class="tags">{post.data.tags.map((tag) => <span class="tag">#{tag}</span>)}</div>
-          )}
-        </article>
+          <div class="post-list">
+            {items.map((post) => (
+              <article data-post data-category={post.data.category} data-tags={post.data.tags.join('|')} data-search={`${post.data.title} ${post.data.description} ${post.data.tags.join(' ')}`}>
+                <a class="card-link" href={`${baseUrl}posts/${post.id}/`} aria-label={post.data.title}></a>
+                <div class="card-top">
+                  <span class="cat">{post.data.category}</span>
+                  <span class="sep">/</span>
+                  <time class="date">{fmt(post.data.date)}</time>
+                </div>
+                <h3>{post.data.title}</h3>
+                {post.data.description && <p class="desc">{post.data.description}</p>}
+                {post.data.tags.length > 0 && (
+                  <div class="tags">{post.data.tags.map((tag) => <span class="tag">#{tag}</span>)}</div>
+                )}
+              </article>
+            ))}
+          </div>
+        </section>
       ))}
     </div>
   </section>
@@ -87,6 +103,10 @@ const pad = (n: number) => String(n).padStart(2, '0');
         && (!keyword || post.dataset.search?.toLowerCase().includes(keyword));
       post.hidden = !matches;
       if (matches) visible += 1;
+    });
+    document.querySelectorAll<HTMLElement>('[data-group-block]').forEach((block) => {
+      const anyVisible = [...block.querySelectorAll<HTMLElement>('[data-post]')].some((p) => !p.hidden);
+      block.hidden = !anyVisible;
     });
     if (count) count.textContent = String(visible).padStart(2, '0');
     if (empty) empty.hidden = visible > 0;
@@ -133,6 +153,11 @@ const pad = (n: number) => String(n).padStart(2, '0');
 
   #empty-state { margin: 44px 0; color: var(--muted); text-align: center; }
 
+  .groups { display: grid; gap: 34px; }
+  .group-block { display: grid; gap: 12px; }
+  .group-head { display: flex; align-items: baseline; gap: 10px; }
+  .group-title { margin: 0; font-family: var(--mono); font-size: .82rem; font-weight: 700; letter-spacing: .05em; color: var(--accent); text-transform: uppercase; }
+  .group-count { font-family: var(--mono); color: var(--faint); font-size: .74rem; font-variant-numeric: tabular-nums; }
   .post-list { display: grid; gap: 12px; }
   article { position: relative; padding: 24px 28px; border: 1px solid var(--border); border-radius: var(--r); background: var(--surface); box-shadow: var(--shadow-sm); transition: transform .2s ease, box-shadow .24s ease, border-color .2s ease; }
   article:hover { transform: translateY(-2px); box-shadow: var(--shadow); border-color: color-mix(in srgb, var(--accent) 30%, var(--border)); }

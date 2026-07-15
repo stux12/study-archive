@@ -13,6 +13,7 @@ const property = {
   status: process.env.NOTION_STATUS_PROPERTY || '상태',
   tags: process.env.NOTION_TAGS_PROPERTY || '태그',
   category: process.env.NOTION_CATEGORY_PROPERTY || '카테고리',
+  group: process.env.NOTION_GROUP_PROPERTY || '분야',
   slug: process.env.NOTION_SLUG_PROPERTY || '슬러그',
   summary: process.env.NOTION_SUMMARY_PROPERTY || '요약',
   date: process.env.NOTION_DATE_PROPERTY || '학습일',
@@ -269,6 +270,7 @@ async function preparePages(pages, { dryRun }) {
     const title = plain(value(page, property.title, 'title')) || '제목 없음';
     const slug = slugFor(page);
     const tags = (value(page, property.tags, 'multi_select') || []).map((tag) => tag.name);
+    const group = value(page, property.group, 'select')?.name || '기타';
     const category = value(page, property.category, 'select')?.name || '미분류';
     const summary = plain(value(page, property.summary, 'rich_text'));
     const date = value(page, property.date, 'date')?.start || page.last_edited_time.slice(0, 10);
@@ -276,7 +278,7 @@ async function preparePages(pages, { dryRun }) {
     if (!dryRun) await fs.rm(path.resolve(ASSETS_ROOT, slug), { recursive: true, force: true });
     const ctx = { slug, title, imageIndex: 0, dryRun };
     const body = await renderBlocksMd(await blocksFor(page.id), ctx);
-    entries.push({ id: page.id, title, slug, tags, category, summary, date, body });
+    entries.push({ id: page.id, title, slug, group, tags, category, summary, date, body });
   }
   return entries;
 }
@@ -344,7 +346,7 @@ async function writeEntries(entries, keepSlugs, outputDir) {
 
   // Published 재생성분만 새로 쓴다. 완료 고정 글은 이미 커밋된 파일을 그대로 둔다.
   for (const entry of entries) {
-    const frontmatter = `---\ntitle: ${JSON.stringify(entry.title)}\ndescription: ${JSON.stringify(entry.summary)}\ndate: ${entry.date}\ncategory: ${JSON.stringify(entry.category)}\ntags: ${JSON.stringify(entry.tags)}\ndraft: false\nnotionId: ${JSON.stringify(entry.id)}\n---\n\n`;
+    const frontmatter = `---\ntitle: ${JSON.stringify(entry.title)}\ndescription: ${JSON.stringify(entry.summary)}\ndate: ${entry.date}\ngroup: ${JSON.stringify(entry.group)}\ncategory: ${JSON.stringify(entry.category)}\ntags: ${JSON.stringify(entry.tags)}\ndraft: false\nnotionId: ${JSON.stringify(entry.id)}\n---\n\n`;
     await fs.writeFile(path.join(outputDir, `${entry.slug}.md`), frontmatter + entry.body, 'utf8');
   }
 }

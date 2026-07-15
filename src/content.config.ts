@@ -7,6 +7,7 @@ const posts = defineCollection({
     title: z.string(),
     description: z.string().default(''),
     date: z.coerce.date(),
+    group: z.string().default('기타'),
     category: z.string().default('미분류'),
     tags: z.array(z.string()).default([]),
     draft: z.boolean().default(false),
