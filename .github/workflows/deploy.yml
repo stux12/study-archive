@@ -13,6 +13,11 @@ on:
         required: true
         type: boolean
         default: true
+      force_resync:
+        description: '완료 상태 글도 다시 가져와 갱신합니다(평소엔 고정됨).'
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -41,6 +46,7 @@ jobs:
         if: ${{ inputs.dry_run || inputs.sync_notion }}
         run: npm run sync:notion ${{ inputs.dry_run && '-- --dry-run' || '' }}
         env:
+          FORCE_RESYNC: ${{ inputs.force_resync && '1' || '0' }}
           NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
           NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
           NOTION_DATA_SOURCE_ID: ${{ secrets.NOTION_DATA_SOURCE_ID }}

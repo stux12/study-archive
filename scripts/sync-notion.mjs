@@ -353,6 +353,8 @@ async function writeEntries(entries, keepSlugs, outputDir) {
 
 async function main() {
   const dryRun = process.argv.includes('--dry-run') || process.env.DRY_RUN === '1';
+  // 평소엔 '완료' 글을 고정하지만, 이 옵션을 켜면 완료 글도 다시 가져와 갱신한다.
+  const forceResync = process.argv.includes('--force-resync') || process.env.FORCE_RESYNC === '1';
 
   let dataSourceId = configuredDataSourceId;
   if (!dataSourceId) {
@@ -372,9 +374,11 @@ async function main() {
   const doneToBake = [];
   for (const page of donePages) {
     const slug = slugFor(page);
-    if (existingSlugs.has(slug)) frozenSlugs.add(slug); // 이미 파일이 있으면 재조회 없이 고정
-    else doneToBake.push(page);                          // 파일이 없으면(예: 곧바로 완료) 이번에 한 번만 생성
+    // forceResync면 고정하지 않고 전부 다시 생성한다.
+    if (!forceResync && existingSlugs.has(slug)) frozenSlugs.add(slug); // 이미 파일이 있으면 재조회 없이 고정
+    else doneToBake.push(page);                                         // 파일이 없거나 강제 갱신이면 생성
   }
+  if (forceResync) console.log('🔄 force-resync: 완료 글도 다시 가져옵니다(고정 해제).');
 
   const entries = await preparePages([...publishedPages, ...doneToBake], { dryRun });
   const keepSlugs = new Set([...entries.map((entry) => entry.slug), ...frozenSlugs]);
