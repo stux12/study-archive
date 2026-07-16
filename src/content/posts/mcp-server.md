@@ -1,6 +1,6 @@
 ---
 title: "MCP 서버란 무엇이고 어떻게 쓰는가?"
-description: "MCP(Model Context Protocol)는 AI 어시스턴트를 외부 도구·데이터에 연결하는 개방형 표준이다. 'AI를 위한 USB-C'처럼, MCP 서버가 내놀는 도구·리소스를 클라이언트(Claude Code 등)가 불러 쓴다. 개념·연결 방식·안전하게 쓰는 법을 정리한다."
+description: "MCP(Model Context Protocol)는 AI 어시스턴트를 외부 도구·데이터에 연결하는 개방형 표준이다. 'AI를 위한 USB-C'처럼, MCP 서버가 제공하는 도구·리소스를 클라이언트(Claude Code 등)가 불러 쓴다. 개념·연결 방식·안전하게 쓰는 법을 정리한다."
 date: 2026-07-16
 group: "AI"
 category: "Claude"
