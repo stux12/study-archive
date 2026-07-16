@@ -110,6 +110,37 @@ const fontHref = 'https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist
       })();
     </script>
 
+    <script>
+      // 코드블록 복사 버튼 (Mermaid 다이어그램은 제외)
+      document.querySelectorAll<HTMLElement>('.prose pre:not(.mermaid)').forEach((pre) => {
+        const wrap = document.createElement('div');
+        wrap.className = 'code-wrap';
+        pre.parentNode?.insertBefore(wrap, pre);
+        wrap.appendChild(pre);
+
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'copy-btn';
+        btn.textContent = '복사';
+        btn.setAttribute('aria-label', '코드 복사');
+        wrap.appendChild(btn);
+
+        let timer = 0;
+        btn.addEventListener('click', async () => {
+          const code = pre.querySelector('code')?.textContent ?? pre.textContent ?? '';
+          try {
+            await navigator.clipboard.writeText(code);
+            btn.textContent = '복사됨';
+            btn.classList.add('is-done');
+          } catch {
+            btn.textContent = '실패';
+          }
+          clearTimeout(timer);
+          timer = window.setTimeout(() => { btn.textContent = '복사'; btn.classList.remove('is-done'); }, 1500);
+        });
+      });
+    </script>
+
     <!-- 방문자 수 집계(GoatCounter) — 쿠키 없이 집계 -->
     <script is:inline data-goatcounter="https://jkim.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
 
@@ -296,6 +327,19 @@ const fontHref = 'https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist
   /* Mermaid 다이어그램(코드블록 스타일 초기화) */
   .prose pre.mermaid { margin: 1.6em 0; padding: 8px 0; background: transparent; border: 0; box-shadow: none; text-align: center; overflow-x: auto; color: var(--muted); }
   .prose pre.mermaid svg { max-width: 100%; height: auto; }
+  /* 코드블록 복사 버튼 */
+  .code-wrap { position: relative; }
+  .code-wrap > pre { margin: 0; }
+  .copy-btn { position: absolute; top: 12px; right: 12px; z-index: 2; padding: 5px 10px; border-radius: 7px; cursor: pointer;
+    border: 1px solid color-mix(in srgb, var(--code-text) 22%, transparent);
+    background: color-mix(in srgb, var(--code-bg) 82%, var(--code-text) 8%);
+    color: var(--code-text); font-family: var(--mono); font-size: .72rem;
+    opacity: 0; transition: opacity .16s ease, color .16s ease, border-color .16s ease; }
+  .code-wrap:hover .copy-btn, .copy-btn:focus-visible { opacity: 1; }
+  .copy-btn:hover { border-color: color-mix(in srgb, var(--code-text) 45%, transparent); }
+  .copy-btn.is-done { opacity: 1; color: #4ade80; border-color: #4ade80; }
+  @media (hover: none) { .copy-btn { opacity: 1; } }
+
   code { background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; padding: .1em .4em; font-family: var(--mono); font-size: .84em; color: var(--heading); }
   pre { margin: 1.5em 0; padding: 20px 22px; overflow-x: auto; border-radius: var(--r); background: var(--code-bg); color: var(--code-text); box-shadow: var(--shadow); border: 1px solid color-mix(in srgb, var(--code-text) 10%, transparent); line-height: 1.62; font-size: .9rem; }
   pre code { background: transparent; border: 0; padding: 0; color: inherit; font-size: .86rem; }
