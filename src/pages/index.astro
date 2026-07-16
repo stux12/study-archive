@@ -11,6 +11,10 @@ const tags = [...new Set(posts.flatMap((post) => post.data.tags))].sort((a, b) =
 const postsByGroup = [...new Set(posts.map((post) => post.data.group))]
   .map((group) => ({ group, items: posts.filter((post) => post.data.group === group) }));
 const groupNames = postsByGroup.map(({ group }) => group);
+const stats = postsByGroup
+  .map(({ group, items }) => ({ group, count: items.length }))
+  .sort((a, b) => b.count - a.count);
+const maxCount = Math.max(1, ...stats.map((s) => s.count));
 const categoriesByGroup = Object.fromEntries(
   postsByGroup.map(({ group, items }) => [group, [...new Set(items.map((post) => post.data.category))].sort()]),
 );
@@ -37,6 +41,24 @@ const pad = (n: number) => String(n).padStart(2, '0');
       </blockquote>
     </div>
   </section>
+
+  {stats.length > 0 && (
+    <section class="stats" aria-label="분야별 학습 기록 분포">
+      <div class="stats-head">
+        <span class="stats-title">분야별 기록</span>
+        <span class="stats-sum">총 {posts.length}편 · 분야 {stats.length}</span>
+      </div>
+      <ul class="bars">
+        {stats.map(({ group, count }) => (
+          <li class="bar-row">
+            <span class="bar-label">{group}</span>
+            <span class="bar-track"><span class="bar-fill" style={`width:${(count / maxCount) * 100}%`}></span></span>
+            <span class="bar-num">{count}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )}
 
   <section aria-labelledby="posts-title">
     <div class="section-heading">
@@ -226,6 +248,17 @@ const pad = (n: number) => String(n).padStart(2, '0');
   .hero-quote cite { display: block; margin-top: 9px; font-family: var(--mono); font-style: normal; color: var(--muted); font-size: .78rem; letter-spacing: .02em; }
   .hero-quote cite::before { content: '— '; color: var(--faint); }
 
+  .stats { margin-bottom: 30px; padding: 18px 20px; border: 1px solid var(--border); border-radius: var(--r); background: var(--surface); box-shadow: var(--shadow-sm); }
+  .stats-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+  .stats-title { font-family: var(--mono); color: var(--faint); font-size: .7rem; letter-spacing: .08em; }
+  .stats-sum { font-family: var(--mono); color: var(--muted); font-size: .78rem; font-variant-numeric: tabular-nums; }
+  .bars { list-style: none; margin: 0; padding: 0; display: grid; gap: 9px; }
+  .bar-row { display: grid; grid-template-columns: 7.5rem 1fr 1.6rem; align-items: center; gap: 12px; }
+  .bar-label { font-size: .84rem; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bar-track { height: 8px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+  .bar-fill { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 55%, transparent), var(--accent)); }
+  .bar-num { font-family: var(--mono); color: var(--muted); font-size: .78rem; text-align: right; font-variant-numeric: tabular-nums; }
+
   .section-heading { display: flex; align-items: baseline; gap: 12px; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
   .section-heading h2 { margin: 0; font-size: 1.15rem; font-weight: 700; }
   .count { font-family: var(--mono); color: var(--faint); font-size: .92rem; font-variant-numeric: tabular-nums; }
@@ -271,5 +304,6 @@ const pad = (n: number) => String(n).padStart(2, '0');
   @media (max-width: 560px) {
     article { padding: 20px; }
     .chip-label { min-width: auto; width: 100%; }
+    .bar-row { grid-template-columns: 5.5rem 1fr 1.4rem; gap: 8px; }
   }
 </style>
