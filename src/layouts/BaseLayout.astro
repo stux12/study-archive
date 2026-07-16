@@ -75,7 +75,10 @@ const fontHref = 'https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist
     <main><slot /></main>
     <footer>
       <span>꾸준히 배우고, 이해한 만큼 기록합니다.</span>
-      <a href={rssURL}>RSS</a>
+      <div class="footer-right">
+        <span class="visits" id="visits" hidden>방문자 <b id="visit-count"></b></span>
+        <a href={rssURL}>RSS</a>
+      </div>
     </footer>
 
     <script>
@@ -109,6 +112,26 @@ const fontHref = 'https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist
 
     <!-- 방문자 수 집계(GoatCounter) — 쿠키 없이 집계 -->
     <script is:inline data-goatcounter="https://jkim.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+
+    <!-- 집계된 방문자 수를 푸터에 표시(GoatCounter 설정에서 공개 카운터 허용 필요) -->
+    <script is:inline>
+      (async () => {
+        try {
+          const res = await fetch('https://jkim.goatcounter.com/counter/TOTAL.json');
+          if (!res.ok) return;
+          const data = await res.json();
+          const value = data.count_unique ?? data.count;
+          if (!value) return;
+          const el = document.getElementById('visit-count');
+          const box = document.getElementById('visits');
+          if (!el || !box) return;
+          el.textContent = value;
+          box.hidden = false;
+        } catch {
+          /* 카운터가 비공개거나 네트워크 오류면 조용히 숨김 */
+        }
+      })();
+    </script>
   </body>
 </html>
 <style is:global>
@@ -207,6 +230,9 @@ const fontHref = 'https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist
   footer { border-top: 1px solid var(--border); padding-block: 34px; margin-top: 28px; color: var(--muted); font-size: .88rem; display: flex; align-items: center; justify-content: space-between; gap: 12px; position: relative; z-index: 1; }
   footer a { font-family: var(--mono); color: var(--muted); text-decoration: none; font-size: .8rem; letter-spacing: .04em; }
   footer a:hover { color: var(--accent); }
+  .footer-right { display: flex; align-items: center; gap: 14px; }
+  .visits { font-family: var(--mono); color: var(--faint); font-size: .78rem; letter-spacing: .02em; }
+  .visits b { color: var(--muted); font-weight: 700; }
 
   a { color: var(--accent); text-decoration-thickness: 1.5px; text-underline-offset: 2px; }
   h1, h2, h3, h4 { color: var(--heading); line-height: 1.28; letter-spacing: -.022em; text-wrap: balance; }
