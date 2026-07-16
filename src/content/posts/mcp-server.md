@@ -44,17 +44,17 @@ flowchart LR
 
 - **MCP 서버** — 도구·데이터를 "내놀는" 쪽. Notion·GitHub·DB 등 각 서비스마다 하나씩.
 
-# 3. 서버가 내놀는 3가지
+# 3. 서버가 제공하는 3가지
 
 MCP 서버는 세 종류의 기능을 제공한다.
 
 <div class="table-wrap"><table><tr><th>종류</th><th>무엇인가</th><th>예</th></tr><tr><td><strong>Tools (도구)</strong></td><td>모델이 호출하는 '행동'</td><td>페이지 생성, 검색, 커밋</td></tr><tr><td><strong>Resources (리소스)</strong></td><td>읽어오는 '데이터·맥락'</td><td>파일 내용, DB 스키마</td></tr><tr><td><strong>Prompts (프롬프트)</strong></td><td>재사용 템플릿</td><td>정형화된 요청 양식</td></tr></table></div>
 
-<aside class="callout callout--tip"><span class="callout-icon" aria-hidden="true">💡</span><div class="callout-body"><p>가장 많이 쓰는 건 <strong>Tools</strong>다. 이 프로젝트에서도 Notion 서버가 내놀준 <code>notion-create-pages</code>·<code>notion-search</code> 같은 Tool로 학습 글을 만들었다.</p></div></aside>
+<aside class="callout callout--tip"><span class="callout-icon" aria-hidden="true">💡</span><div class="callout-body"><p>가장 많이 쓰는 건 <strong>Tools</strong>다. 내가 학습을 정리해둔 공부 아카이브 사이트도 Notion 서버가 내놓아준 <code>notion-create-pages</code>·<code>notion-search</code> 같은 Tool로 학습 글을 만들었다.</p></div></aside>
 
 # 4. 연결 방식 — 로컬 vs 원격
 
-서버가 어디서 돌느냐에 따라 두 가지다.
+서버가 어디서 환경이 구성되는지에 따라 두 가지다.
 
 <div class="table-wrap"><table><tr><th>방식</th><th>설명</th><th>인증</th></tr><tr><td><strong>로컬 (stdio)</strong></td><td>내 PC에서 서버 프로그램을 프로세스로 실행</td><td>보통 로컬 권한/env</td></tr><tr><td><strong>원격 (HTTP)</strong></td><td>호스팅된 서버에 접속</td><td>보통 OAuth 로그인</td></tr></table></div>
 
@@ -91,14 +91,14 @@ flowchart LR
 
 # 7. 함정과 방지책
 
-<aside class="callout callout--warn"><span class="callout-icon" aria-hidden="true">🧨</span><div class="callout-body"><p><strong>함정 1 — 서버를 마구잡이 많이 켜기.</strong> 서버마다 도구가 늘고, 도구가 많으면 <strong>토큰·컴텍스트 비용</strong>이 커진다.</p><p><strong>방지:</strong> 필요한 서버만 켜고, 안 쓰면 끕다.</p></div></aside>
+<aside class="callout callout--warn"><span class="callout-icon" aria-hidden="true">🧨</span><div class="callout-body"><p><strong>함정 1 — 서버를 마구잡이 많이 켜기.</strong> 서버마다 도구가 늘고, 도구가 많으면 <strong>토큰·컨텍스트 비용</strong>이 커진다.</p><p><strong>방지:</strong> 필요한 서버만 켜고, 안 쓰면 꺼야한다.</p></div></aside>
 
 <aside class="callout callout--warn"><span class="callout-icon" aria-hidden="true">🧨</span><div class="callout-body"><p><strong>함정 2 — 설정 파일에 비밀값 넣기.</strong> <code>.mcp.json</code>에 토큰·키를 직접 적으면 유출 위험.</p><p><strong>방지:</strong> OAuth 방식은 토큰이 별도 저장되어 URL만 남으므로 안전. 로컬 서버는 env·시크릿으로 주입.</p></div></aside>
 
 <aside class="callout callout--warn"><span class="callout-icon" aria-hidden="true">🧨</span><div class="callout-body"><p><strong>함정 3 — 도구가 가져온 내용을 '명령'으로 믿기(프롬프트 인젝션).</strong> 웹페이지·문서에 몰래 적힌 지시를 AI가 그대로 실행하면 위험.</p><p><strong>방지:</strong> 도구가 가져온 외부 내용은 '명령'이 아니라 '데이터'로 취급한다.</p></div></aside>
 
-<aside class="callout callout--warn"><span class="callout-icon" aria-hidden="true">🧨</span><div class="callout-body"><p><strong>함정 4 — 아무 서버나 신뢰하기.</strong> 서버는 내 데이터를 읽고 행동할 수 있다.</p><p><strong>방지:</strong> 공식·검증된 서버 위주로, 그 서버가 어떤 도구를 내놀는지 확인하고 최소 권한으로.</p></div></aside>
+<aside class="callout callout--warn"><span class="callout-icon" aria-hidden="true">🧨</span><div class="callout-body"><p><strong>함정 4 — 아무 서버나 신뢰하기.</strong> 서버는 내 데이터를 읽고 행동할 수 있다.</p><p><strong>방지:</strong> 공식·검증된 서버 위주로, 그 서버가 어떤 도구를  제공하는지 확인하고 최소 권한으로.</p></div></aside>
 
 # 8. 정리하자면
 
-<aside class="callout callout--note"><span class="callout-icon" aria-hidden="true">🙋</span><div class="callout-body"><p><em>(이 칸은 글을 읽고 떠오른 나만의 비유·정리로 채웁니다. 편하게 말씀해 주세요 — 예: "MCP는 ___ 같다.")</em></p></div></aside>
+<aside class="callout callout--note"><span class="callout-icon" aria-hidden="true">🙋</span><div class="callout-body"><p>MCP는 Claude Code를 Vibe Coding 하기 위해서만 사용하는 것을 넘어 현재 이미 나와있는 서비스와의 확장성을 고려하여 AI를 더욱 넓은 범위로 다양하게 사용하기 위한 필수 요소이다.</p></div></aside>
