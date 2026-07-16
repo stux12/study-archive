@@ -23,6 +23,7 @@ const pad = (n: number) => String(n).padStart(2, '0');
 ---
 <BaseLayout>
   <section class="hero">
+    <p class="hero-note">현재 과거 학습 데이터를 꾸준히 정리 중에 있어 계속 추가될 예정입니다.</p>
     <p class="eyebrow">// LEARNING LOG</p>
     <h1>새롭게 알게 된 정보를<br />내 것으로 만들기 위해<br />다시 정리하는 공간</h1>
     <div class="hero-quotes">
@@ -157,6 +158,7 @@ const pad = (n: number) => String(n).padStart(2, '0');
 
 <style>
   .hero { padding: 36px 0 56px; max-width: 42rem; }
+  .hero-note { margin: 0 0 12px; color: var(--muted); font-size: .9rem; line-height: 1.5; }
   .eyebrow { margin: 0 0 16px; font-family: var(--mono); color: var(--accent); font-weight: 600; font-size: .78rem; letter-spacing: .04em; }
   .hero h1 { margin: 0; font-size: clamp(1.95rem, 1.2rem + 2.9vw, 3rem); font-weight: 800; letter-spacing: -.035em; line-height: 1.24; }
   .hero-quotes { margin-top: 28px; display: flex; flex-wrap: wrap; gap: 20px 32px; }
