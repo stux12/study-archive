@@ -1,7 +1,7 @@
 ---
 title: "Docker는 내부에서 어떻게 움직이고 있을까?"
 description: "Docker는 별도 OS를 띄우는 가상머신이 아니라, 리눅스 커널의 격리(namespace)·자원제한(cgroup)·겹침 파일시스템(union fs)을 조합해 '격리된 프로세스'를 실행한다. 핵심 기능과 실제 동작 흐름을 초보자 눈높이로 정리한다."
-date: 2026-07-16
+date: 2022-03-09
 group: "인프라·DevOps"
 category: "컨테이너"
 tags: ["Docker"]
