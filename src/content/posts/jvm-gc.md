@@ -142,6 +142,6 @@ GC(0) Pause Young 24M->5M(256M) 3.412ms
 
 <aside class="callout callout--warn"><span class="callout-icon" aria-hidden="true">🧨</span><div class="callout-body"><p><strong>함정 3 — 메모리만 키우면 된다는 착각.</strong> 창고(<code>-Xmx</code>)를 무작정 키우면, 한 번 큰 청소할 때 멈추는 시간이 오히려 더 길어질 수 있다.</p><p><strong>해결:</strong> 멈춤이 중요하면 크기보다 <strong>청소부 종류 선택</strong>(G1 등)이 먼저다.</p></div></aside>
 
-# 9. 내가 다시 설명한다면
+# 9. 다시 설명하자면
 
-<aside class="callout callout--note"><span class="callout-icon" aria-hidden="true">🙋</span><div class="callout-body"><p><em>(직접 정리한 생각)</em> <strong>JVM과 GC는 CPU와 메모리(램)처럼 서로 뗄 수 없는 짝꿍 같다.</strong> 어느 한쪽만으로는 성능이 나지 않고, 둘이 맞물려 돌아가야 한다. 연산 능력을 조금이라도 끌어올리려면 결국 이 둘을 어떻게 최적화하느냐가 관건이라, JVM·GC는 자바 성능의 필수 요소라고 느껴진다.</p></div></aside>
+<aside class="callout callout--note"><span class="callout-icon" aria-hidden="true">🙋</span><div class="callout-body"><p><strong>JVM과 GC는 CPU와 메모리(램)처럼 서로 뗄 수 없는 짝꿍 같다.</strong> 어느 한쪽만으로는 성능이 나지 않고, 둘이 맞물려 돌아가야 한다. 연산 능력을 조금이라도 끌어올리려면 결국 이 둘을 어떻게 최적화하느냐가 관건이라, JVM·GC는 자바 성능의 필수 요소라고 느껴진다.</p></div></aside>

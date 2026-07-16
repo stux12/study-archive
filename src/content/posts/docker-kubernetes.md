@@ -124,6 +124,6 @@ kubectl scale deployment/web --replicas=5   # 5개로 확장
 
 <aside class="callout callout--warn"><span class="callout-icon" aria-hidden="true">🧨</span><div class="callout-body"><p><strong>함정 4 — 리소스 요청/제한 미설정.</strong> 한 Pod가 메모리를 다 먹어 다른 Pod가 죽거나 배치가 꼬인다.</p><p><strong>해결:</strong> <code>requests</code>/<code>limits</code>로 CPU·메모리 상·하한을 정한다.</p></div></aside>
 
-# 7. 내가 다시 설명한다면
+# 7. 정리하자면
 
 <aside class="callout callout--note"><span class="callout-icon" aria-hidden="true">🙋</span><div class="callout-body"><p>SK 하이닉스 프로젝트를 하면서 kubernetes k8s 환경을 처음 접해봤는데 기존에 docker 만 사용했을 때와는 다르게 docker와 kubernetes를 같이 활용한다면 새로운 클라우드 환경에서도 언제든지 쉽게 서비스를 올릴 수 있겠다라는 생각이 들었다.</p></div></aside>
