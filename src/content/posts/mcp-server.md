@@ -42,7 +42,7 @@ flowchart LR
 
 - **MCP 클라이언트(호스트)** — 도구를 불러 쓰는 쪽. Claude Code, Claude Desktop, IDE 등.
 
-- **MCP 서버** — 도구·데이터를 "내놀는" 쪽. Notion·GitHub·DB 등 각 서비스마다 하나씩.
+- **MCP 서버** — 도구·데이터를 "제공하는" 쪽. Notion·GitHub·DB 등 각 서비스마다 하나씩.
 
 # 3. 서버가 제공하는 3가지
 
