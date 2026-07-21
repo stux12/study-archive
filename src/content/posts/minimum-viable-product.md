@@ -1,8 +1,8 @@
 ---
 title: "MVP??"
 description: "MVP(Minimum Viable Product)는 가장 적은 기능으로 빨리 만들어 '이 제품이 정말 필요한가'를 실제 사용자로 검증하는 제품이다. 기능을 줄이는 게 아니라 '핵심 가설 검증'이 목적이다."
-date: 2026-07-16
-group: "용어"
+date: 2026-07-20
+group: "CS·기초"
 category: "기타"
 tags: ["MVP"]
 draft: false
